@@ -1,7 +1,15 @@
+import time
 
 from IPython.display import clear_output, Image, display, HTML
 import tensorflow as tf
 import numpy as np
+import datetime
+
+
+
+def now_string():
+    a=datetime.datetime.now()
+    return a.strftime("%d_%b_%Y__%H_%M")
 
 def strip_consts(graph_def, max_const_size=32):
     """Strip large constant values from graph_def."""
@@ -40,3 +48,12 @@ def show_graph(graph_def, max_const_size=32):
     with open("test.html",'w') as f:
         f.write(iframe)
     # display(HTML(iframe))
+
+
+class timeit:
+    def __enter__(self):
+        self.st=time.time()
+        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print('elapsed {0}'.format(time.time()-self.st))
+        pass

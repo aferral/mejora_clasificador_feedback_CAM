@@ -1,13 +1,34 @@
 from sklearn.datasets import load_digits
 import numpy as np
 import tensorflow as tf
+import os
+
+"""
+- Inverse transform??
+- index each image for reference????
+
+
+Vis_analysis():
+    for batch in train_data:
+        if batch_l != pred(batch_x):
+            append(wrong_img,pred_label,real_label)
+    
+    print number of wrong
+    print distribution over real classes
+    print distributio over pred classes
+    
+    interactive(show x)
+    show image,image_proc,CAM_real_class,CAM_pred_class
+    
+    save wrong dataset for posterior usage (name of saved model, ask for name)
+
+"""
 
 class Dataset:
     def __init__(self):
 
         assert(hasattr(self, 'iterator')),"Dataset must define a iterator"
 
-        # todo use this ??
         assert (not (self.train_dataset is None)), "Dataset must define a train_dataset"
         assert (not (self.valid_dataset is None)), "Dataset must define a validation_dataset"
 
@@ -26,6 +47,12 @@ class Dataset:
         sess.run(validation_init_op)
         # validation_init_op.run()
 
+    def get_data_range(self):
+        raise NotImplementedError()
+
+    def vis_shape(self):
+        raise NotImplementedError()
+
     @property
     def shape(self):
         raise NotImplementedError()
@@ -34,8 +61,12 @@ class Dataset:
         raise NotImplementedError()
 
 
-    # todo use this?
-    def get_batch(self):
+    def get_train_image_at(self,index):
+        """
+        This function return an image in the trainset. Without the preprocessing step
+        :param index:
+        :return:
+        """
         raise NotImplementedError()
 
 
@@ -46,12 +77,11 @@ class Digits_Dataset(Dataset):
 
     def __init__(self,epochs,batch_size):
 
-
         # Data load
         digits = load_digits(return_X_y=True)
 
         # split into train and validation sets
-        train_images = digits[0][:int(len(digits[0]) * 0.8)]
+        self.train_images = train_images = digits[0][:int(len(digits[0]) * 0.8)]
         train_labels = digits[1][:int(len(digits[0]) * 0.8)]
         one_hot_train_labels = np.zeros((train_labels.shape[0], 10))
         one_hot_train_labels[np.arange(train_labels.shape[0]), train_labels] = 1
@@ -81,11 +111,15 @@ class Digits_Dataset(Dataset):
         # check parameters
         super().__init__()
 
+
     def preprocess_batch(self,image_batch):
         """
         Process a new batch substract train_mean.
         :return:
         """
+        if len(image_batch.shape) != 2 or image_batch.shape[1] != 64:
+            image_batch = image_batch.reshape(-1,64)
+
         return image_batch - self.mean
     @property
     def shape(self):
@@ -94,8 +128,17 @@ class Digits_Dataset(Dataset):
     def shape_target(self):
         return [10]
 
+    def vis_shape(self):
+        return [8,8]
 
+    def get_train_image_at(self, index):
+        return self.train_images[index]
+
+    def get_data_range(self):
+        return [0,16]
 
 
 if __name__ == "__main__":
-    a = Digits_Dataset(1,1)
+    with tf.Session().as_default() as sess:
+        a = Digits_Dataset(1,1)
+        # a.get_train_image_at(0)

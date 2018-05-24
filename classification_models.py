@@ -1,38 +1,33 @@
-from sklearn.datasets import load_digits
+from contextlib import ExitStack
+
 import tensorflow as tf
-import time
 import numpy as np
-import matplotlib.pyplot as plt
-from tensorflow.python import debug as tf_debug
+import os
 
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
-from tensorflow.python.saved_model import tag_constants
-
-from dataset import Dataset, Digits_Dataset
-from utils import show_graph
-
-class timeit:
-    def __enter__(self):
-        self.st=time.time()
-        pass
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        print('elapsed {0}'.format(time.time()-self.st))
-        pass
+from datasets.cifar10_data import Cifar10_Dataset
+from datasets.dataset import Dataset, Digits_Dataset
+from utils import show_graph, now_string, timeit
 
 
-class clasification_model:
+class clasification_model(ExitStack):
 
-    def __init__(self,dataset : Dataset,debug=False):
+    def __init__(self, dataset: Dataset, debug=False, save_name=None):
+        super().__init__()
         self.sess = None
         self.dataset = dataset
         self.debug = debug
-
+        self.save_folder=save_name
 
 
     def __enter__(self):
         assert (self.sess is None), "A session is already active"
         self.sess = tf.Session()
-        self.sess.as_default()
+
+        super().__enter__()
+        self.workdir = self.enter_context(self.sess.as_default())
+
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -120,8 +115,11 @@ class clasification_model:
 
 
         # Save model
-        saver.save(self.sess, './model/check') # todo config output folder
-
+        now = now_string()
+        path_model_checkpoint = os.path.join('model',self.save_folder,now)
+        print("Saving model at {0}".format(path_model_checkpoint))
+        os.makedirs(path_model_checkpoint,exist_ok=True)
+        saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
 
 
     def feed_forward_vis(self,image):
@@ -135,7 +133,7 @@ class clasification_model:
             feed_dict=fd
         )
 
-        return conv_acts, softmax_w, pred
+        return image,conv_acts, softmax_w, pred
 
     def load(self,metagrap_path,model_folder):
 
@@ -173,7 +171,10 @@ class clasification_model:
         :return:
         """
 
-        conv_acts, softmax_w, pred = self.feed_forward_vis(image)
+        if len(image.shape) != (len(self.dataset.shape) +1): # Put in batch format
+            image = image.reshape([-1] + list(image.shape))
+
+        img_proc,conv_acts, softmax_w, pred = self.feed_forward_vis(image)
 
         conv_acts = conv_acts[0]
         print("conv_acts.shape: {0}".format(conv_acts.shape) )
@@ -192,13 +193,13 @@ class clasification_model:
             temp = (temp - temp.min()) / (temp.max() - temp.min())
             out_maps_per_class[i] = temp
 
-        return image,pred[0],(out_maps_per_class)
+        return img_proc,pred[0],(out_maps_per_class)
 
 
 class digits_clasifier(clasification_model):
 
     def __init__(self, dataset: Dataset, debug=False):
-        super().__init__(dataset, debug)
+        super().__init__(dataset, debug,'digit_classifier')
 
         self.reg_factor = 0.1
         self.kp = 0.95
@@ -213,7 +214,7 @@ class digits_clasifier(clasification_model):
         keep_p = self.keep_p =tf.placeholder(tf.float64, name='k_prob')
 
 
-        inp_reshaped = tf.reshape(self.input_l, [-1, 8, 8, 1])
+        inp_reshaped = tf.cast(tf.reshape(self.input_l, [-1, 8, 8, 1]),tf.float32)
         conv1 = tf.layers.conv2d(inp_reshaped, 30, (2, 2), padding='same', activation=tf.nn.relu,
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
         pool1 = tf.layers.max_pooling2d(conv1, (2, 2), (2, 2))
@@ -246,38 +247,88 @@ class digits_clasifier(clasification_model):
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
 
+class cifar10_classifier(clasification_model):
+
+    def __init__(self, dataset: Dataset, debug=False):
+        super().__init__(dataset, debug,'cifar10_classifier')
+
+        self.reg_factor = 0.1
+        self.lr = 0.001
+
+    def get_feed_dict(self,isTrain):
+        return {}
+
+    def define_arch(self):
+
+        # inp_reshaped = tf.reshape(self.input_l, [-1, 8, 8, 1])
+        r_input = tf.cast(self.input_l, tf.float32)
+        conv1 = tf.layers.conv2d(r_input, 30, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
+        pool1 = tf.layers.max_pooling2d(conv1, (2, 2), (2, 2))
+
+        conv2 = tf.layers.conv2d(pool1, 40, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
+        pool2 = tf.layers.max_pooling2d(conv2, (2, 2), (2, 2))
+
+        conv3 = tf.layers.conv2d(pool2, 50, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer()
+                                 ,name='last_conv_act')
+
+        global_average_pool = tf.reduce_mean(conv3, [1, 2])
+
+        out = tf.layers.dense(global_average_pool, 10, use_bias=False,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                              kernel_regularizer=tf.contrib.layers.l2_regularizer(self.reg_factor), name='softmax_layer')
+
+        # Configure values for visualization
+        self.last_conv = conv3
+        self.softmax_weights = "softmax_layer/kernel:0"
+        self.pred = tf.nn.softmax(out, name='prediction')
+
+        self.loss = tf.losses.softmax_cross_entropy(self.targets, out)
+        self.train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss)
+
+        # get accuracy
+        prediction = tf.argmax(out, 1)
+        equality = tf.equal(prediction, tf.argmax(self.targets, 1))
+        self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
 
 
-
-
+def imshow_util(x,minmaxrange):
+    """
+    Convert image x to 0-1 float range given the min max original range (for imshow)
+    :param x: Image
+    :param minmaxrange:
+    :return:
+    """
+    return (x-minmaxrange[0]) / (minmaxrange[1] - minmaxrange[0])
 
 if __name__ == '__main__':
-    train=True
+    train=False
 
-    # Todo improve model save
     # todo improve dataset get
     # start to work on mnist or VOC
 
-    dataset = Digits_Dataset(epochs=20,batch_size=30)
+    # dataset = Digits_Dataset(epochs=20,batch_size=30)
+    dataset = Cifar10_Dataset(2,40)
 
-    with digits_clasifier(dataset, debug=False) as model:
+    with cifar10_classifier(dataset, debug=False) as model:
 
         if train:
             model.train()
         else:
-            model.load('./model/check.meta','./model')
+            model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
+            #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
+            # model.eval()
 
 
-            # todo imporve this
-            digits = load_digits(return_X_y=True)
-            test_image = (digits[0][1]).reshape(1,64)
-
+            test_image = dataset.get_train_image_at(0)[0]
+            test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
 
             image_processed, prediction, cmaps = model.visualize(test_image)
 
-            test_image_plot = image_processed.reshape((8, 8))
-
+            image_processed_plot = imshow_util( image_processed.reshape(dataset.vis_shape()),dataset.get_data_range())
 
             p_class = np.argmax(prediction)
             print("Predicted {0} with score {1}".format(p_class,np.max(prediction)))
@@ -287,8 +338,9 @@ if __name__ == '__main__':
             import matplotlib.pyplot as plt
             from skimage.transform import resize
 
+
             plt.figure()
-            plt.imshow(test_image.reshape(8,8),cmap='gray')
+            plt.imshow(image_processed_plot,cmap='gray')
 
             plt.figure()
             plt.imshow(test_image_plot,cmap='gray')
@@ -297,12 +349,15 @@ if __name__ == '__main__':
             plt.figure()
             plt.imshow(cmaps[0],cmap='jet',interpolation='none')
 
-
-            resized_map = resize(cmaps[0],(test_image_plot.shape))
+            out_shape = list(test_image_plot.shape)
+            if len(test_image_plot.shape) == 3:
+                out_shape = out_shape[0:2]
+            print(out_shape)
+            resized_map = resize(cmaps[0],out_shape)
             plt.figure()
             plt.imshow(resized_map,cmap='jet')
 
             fig, ax = plt.subplots()
-            ax.imshow(resized_map, cmap='jet',alpha=0.6)
-            ax.imshow(test_image_plot,alpha=0.4,cmap='gray')
+            ax.imshow(resized_map, cmap='jet',alpha=0.7)
+            ax.imshow(image_processed_plot,alpha=0.3,cmap='gray')
             plt.show()
