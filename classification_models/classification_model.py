@@ -10,7 +10,7 @@ from datasets.dataset import Dataset, Digits_Dataset
 from utils import show_graph, now_string, timeit
 
 
-class clasification_model(ExitStack):
+class Abstract_model(ExitStack):
 
     def __init__(self, dataset: Dataset, debug=False, save_name=None):
         super().__init__()
@@ -196,7 +196,7 @@ class clasification_model(ExitStack):
         return img_proc,pred[0],(out_maps_per_class)
 
 
-class digits_clasifier(clasification_model):
+class digits_clasifier(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False):
         super().__init__(dataset, debug,'digit_classifier')
@@ -247,7 +247,7 @@ class digits_clasifier(clasification_model):
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
 
-class cifar10_classifier(clasification_model):
+class cifar10_classifier(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False):
         super().__init__(dataset, debug,'cifar10_classifier')

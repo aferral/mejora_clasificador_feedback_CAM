@@ -24,6 +24,10 @@ def strip_consts(graph_def, max_const_size=32):
                 tensor.tensor_content = b"<stripped %d bytes>"%size
     return strip_def
 
+def save_graph_txt(graph):
+    with open('graphpb.txt', 'w') as f:
+        f.write(str(graph.as_graph_def()))
+
 def show_graph(graph_def, max_const_size=32):
     """Visualize TensorFlow graph."""
     if hasattr(graph_def, 'as_graph_def'):
