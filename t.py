@@ -1,10 +1,17 @@
+from contextlib import ExitStack
+
+import tensorflow as tf
 import numpy as np
-from tensorflow.python.saved_model import tag_constants
+import os
 
-from utils import show_graph
+# From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
+from classification_models.classification_model import imshow_util
+from classification_models.vgg16_edited import vgg_16_CAM
+from datasets.cifar10_data import Cifar10_Dataset
+from datasets.dataset import Dataset, Digits_Dataset
+from datasets.imagenet_data import Imagenet_Dataset
+from utils import show_graph, now_string, timeit
 
-a=[1,2,3]
-print(np.array(a))
 
 """
 # Install
@@ -70,41 +77,62 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
-with tf.Session() as sess:
-    new_saver = tf.train.import_meta_graph('./model/check.meta')
-    new_saver.restore(sess, tf.train.latest_checkpoint('./model/'))
+if __name__ == '__main__':
+    train=True
 
-    print([n.name for n in tf.get_default_graph().as_graph_def().node])
+    # todo improve dataset get
+    # todo add submodules for tf_models
+    # start to work on mnist or VOC
 
-    graph = tf.get_default_graph()
-    show_graph(graph)
+    # dataset = Digits_Dataset(epochs=20,batch_size=30)
+    #dataset = Cifar10_Dataset(2,40)
+    dataset = Imagenet_Dataset(1,10)
 
-    test_image = np.random.rand(1,64)
+    with vgg_16_CAM(dataset, debug=False) as model:
 
-    conv_acts,softmax_w,pred = sess.run(
-        ["last_conv_act/Relu:0","softmax_layer/kernel:0","prediction:0"],
-        feed_dict={"model_input:0": test_image,"k_prob:0": 1.0 }
-    )
-
-    batch_index=0
-    index_class=0
-
-    print(conv_acts.shape)
-    print(softmax_w.shape)
-    print(pred.shape)
-
-    conv_acts = conv_acts[0]
-    print("Prediciont {0}".format(pred[batch_index]))
-
-    result = (conv_acts[:, :, :] * softmax_w[:, index_class]).sum(axis=2)
+        if train:
+            model.train()
+        else:
+            model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
+            #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
+            # model.eval()
 
 
+            test_image = dataset.get_train_image_at(0)[0]
+            test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(test_image.reshape(8, 8))
+            image_processed, prediction, cmaps = model.visualize(test_image)
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(result.reshape(2, 2))
+            image_processed_plot = imshow_util( image_processed.reshape(dataset.vis_shape()),dataset.get_data_range())
 
-    plt.show()
+            p_class = np.argmax(prediction)
+            print("Predicted {0} with score {1}".format(p_class,np.max(prediction)))
+            print(cmaps.shape)
+            print("CMAP: ")
 
+            import matplotlib.pyplot as plt
+            from skimage.transform import resize
+
+
+            plt.figure()
+            plt.imshow(image_processed_plot,cmap='gray')
+
+            plt.figure()
+            plt.imshow(test_image_plot,cmap='gray')
+
+
+            plt.figure()
+            plt.imshow(cmaps[0],cmap='jet',interpolation='none')
+
+            out_shape = list(test_image_plot.shape)
+            if len(test_image_plot.shape) == 3:
+                out_shape = out_shape[0:2]
+            print(out_shape)
+            resized_map = resize(cmaps[0],out_shape)
+            plt.figure()
+            plt.imshow(resized_map,cmap='jet')
+
+            fig, ax = plt.subplots()
+            ax.imshow(resized_map, cmap='jet',alpha=0.7)
+            ax.imshow(image_processed_plot,alpha=0.3,cmap='gray')
+            plt.show()

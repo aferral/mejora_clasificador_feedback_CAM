@@ -4,30 +4,53 @@ from datasets.dataset import Dataset
 from tf_records_parser.cifar10 import LOCAL_FOLDER
 import numpy as np
 
+IMAGE_SHAPE = [224,224,3]
+
 def parse_function(example_proto):
-    features = {"image_raw": tf.FixedLenFeature((), tf.string),
-                "label": tf.FixedLenFeature((), tf.int64),
-                "height": tf.FixedLenFeature((), tf.int64),
-                "width": tf.FixedLenFeature((), tf.int64),
-                "depth": tf.FixedLenFeature((), tf.int64)
+    features = {"image/encoded": tf.FixedLenFeature((), tf.string),
+                "image/label": tf.FixedLenFeature((), tf.int64),
+                "image/height": tf.FixedLenFeature((), tf.int64),
+                "image/width": tf.FixedLenFeature((), tf.int64),
+                "image/channels": tf.FixedLenFeature((), tf.int64)
                 }
     parsed_features = tf.parse_single_example(example_proto, features)
-    h, w, d = parsed_features['height'], parsed_features['width'], parsed_features['depth']
 
-    flat_image = tf.decode_raw(parsed_features["image_raw"], tf.uint8)
-    reconst = tf.cast(tf.transpose(tf.reshape(flat_image, tf.stack([d, h, w])), [1, 2, 0], 'reconstructed_image'),tf.float32)
+    image = tf.image.decode_jpeg(parsed_features["image/encoded"],channels=3)
 
-    return reconst, parsed_features["label"]
+    # tf.Assert(tf.shape(image)[2] == 3,[image])
+    reconst = tf.image.resize_images(image,IMAGE_SHAPE[0:2])
 
+    reconst = tf.cast(reconst,tf.float32,name='image_reshaped')
 
-class Cifar10_Dataset(Dataset):
+    return reconst, parsed_features["image/label"]
 
+def get_records_folder():
+    return  os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset")
+
+def list_records():
+    path_records = get_records_folder()
+
+    # list all tfrecords
+    tfrecords = list(map(lambda x: os.path.join(path_records, x), sorted(filter(
+        lambda name: name.split('.')[-1] == 'tfrecord',
+        os.listdir(path_records)))))
+    return tfrecords
+
+class Imagenet_Dataset(Dataset):
 
     def __init__(self,epochs,batch_size):
+        tfrecords = list_records()
 
-        train_records = os.path.join(LOCAL_FOLDER,'train.tfrecords')
-        validation_records = os.path.join(LOCAL_FOLDER, 'validation.tfrecords')
-        test_records = os.path.join(LOCAL_FOLDER, 'eval.tfrecords')
+        train_n_records = 26
+        val_n_records = 2
+        test_n_records = 2
+        n_records = len(tfrecords)
+
+        assert(train_n_records+val_n_records+test_n_records == n_records),"The train-val-test split must use all tf records."
+
+        train_records = tfrecords[0:train_n_records]
+        validation_records = tfrecords[train_n_records:train_n_records+val_n_records]
+        test_records = tfrecords[train_n_records+val_n_records:]
 
         dataset_train = tf.data.TFRecordDataset(train_records).map(parse_function)
         dataset_val = tf.data.TFRecordDataset(validation_records).map(parse_function)
@@ -35,18 +58,18 @@ class Cifar10_Dataset(Dataset):
 
 
         # Calculate mean image, std image
-        mean_image_path = os.path.join(LOCAL_FOLDER,'mean.npy')
+        mean_image_path = os.path.join(LOCAL_FOLDER,'mean_imagenet.npy')
 
         if not os.path.exists(mean_image_path):
             sess = tf.get_default_session()
-            temp_iterator = dataset_train.batch(300).make_one_shot_iterator().get_next()
-            p_mean = np.zeros((32,32,3))
+            temp_iterator = dataset_train.batch(10).make_one_shot_iterator().get_next()
+            p_mean = np.zeros(IMAGE_SHAPE)
             c=0
 
             try:
                 while True:
                     batch_x, batch_y = sess.run(temp_iterator)
-                    p_mean = p_mean + np.mean(batch_x,axis=0) #(32,32,3)
+                    p_mean = p_mean + np.mean(batch_x,axis=0) # IMAGE_SHAPE
                     c+=1
             except tf.errors.OutOfRangeError:
                 self.mean = (p_mean / c).astype(np.float32)
@@ -57,7 +80,7 @@ class Cifar10_Dataset(Dataset):
             self.mean = np.load(mean_image_path)
 
         def preprocess(x,y):
-            return (tf.add(x, -self.mean),tf.one_hot(y,10))
+            return (tf.add(x, -self.mean),tf.one_hot(y,21))
 
         # preprocesss
         self.train_dataset = dataset_train.map(preprocess).shuffle(500).repeat(epochs).batch(batch_size).cache().prefetch(2000)
@@ -77,20 +100,15 @@ class Cifar10_Dataset(Dataset):
         Process a new batch substract train_mean.
         :return:
         """
-        if len(image_batch.shape) == 4 and image_batch.shape[1:] != (32,32,3):
-            assert (False),'batch shape wrong'
-
-        if len(image_batch.shape) == 3 and image_batch.shape != (32,32,3):
-            assert(False),'batch shape wrong'
 
         return image_batch - self.mean
 
     @property
     def shape(self):
-        return [32,32,3]
+        return IMAGE_SHAPE
     @property
     def shape_target(self):
-        return [10]
+        return [21]
 
     def get_train_image_at(self, index):
         sess = tf.get_default_session()
@@ -102,8 +120,8 @@ class Cifar10_Dataset(Dataset):
         return [0,255]
 
     def vis_shape(self):
-        return [32,32,3]
+        return IMAGE_SHAPE
 
 if __name__ == '__main__':
     with tf.Session().as_default() as sess:
-        Cifar10_Dataset(1,10)
+        Imagenet_Dataset(1,10)
