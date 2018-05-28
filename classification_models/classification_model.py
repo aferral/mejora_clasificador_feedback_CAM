@@ -25,8 +25,10 @@ class Abstract_model(ExitStack):
         self.sess = tf.Session()
 
         super().__enter__()
-        self.workdir = self.enter_context(self.sess.as_default())
+        self.enter_context(self.sess.as_default())
 
+        #Build network
+        self.define_arch_base()
 
         return self
 
@@ -87,7 +89,6 @@ class Abstract_model(ExitStack):
 
 
     def train(self):
-        self.define_arch_base()
 
 
         saver = tf.train.Saver()
@@ -137,8 +138,6 @@ class Abstract_model(ExitStack):
 
     def load(self,metagrap_path,model_folder):
 
-
-        self.define_arch_base()
 
         new_saver = tf.train.Saver()
         new_saver.restore(self.sess, tf.train.latest_checkpoint(model_folder))
@@ -304,60 +303,3 @@ def imshow_util(x,minmaxrange):
     """
     return (x-minmaxrange[0]) / (minmaxrange[1] - minmaxrange[0])
 
-if __name__ == '__main__':
-    train=False
-
-    # todo improve dataset get
-    # start to work on mnist or VOC
-
-    # dataset = Digits_Dataset(epochs=20,batch_size=30)
-    dataset = Cifar10_Dataset(2,40)
-
-    with cifar10_classifier(dataset, debug=False) as model:
-
-        if train:
-            model.train()
-        else:
-            model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
-            #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
-            # model.eval()
-
-
-            test_image = dataset.get_train_image_at(0)[0]
-            test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
-
-            image_processed, prediction, cmaps = model.visualize(test_image)
-
-            image_processed_plot = imshow_util( image_processed.reshape(dataset.vis_shape()),dataset.get_data_range())
-
-            p_class = np.argmax(prediction)
-            print("Predicted {0} with score {1}".format(p_class,np.max(prediction)))
-            print(cmaps.shape)
-            print("CMAP: ")
-
-            import matplotlib.pyplot as plt
-            from skimage.transform import resize
-
-
-            plt.figure()
-            plt.imshow(image_processed_plot,cmap='gray')
-
-            plt.figure()
-            plt.imshow(test_image_plot,cmap='gray')
-
-
-            plt.figure()
-            plt.imshow(cmaps[0],cmap='jet',interpolation='none')
-
-            out_shape = list(test_image_plot.shape)
-            if len(test_image_plot.shape) == 3:
-                out_shape = out_shape[0:2]
-            print(out_shape)
-            resized_map = resize(cmaps[0],out_shape)
-            plt.figure()
-            plt.imshow(resized_map,cmap='jet')
-
-            fig, ax = plt.subplots()
-            ax.imshow(resized_map, cmap='jet',alpha=0.7)
-            ax.imshow(image_processed_plot,alpha=0.3,cmap='gray')
-            plt.show()

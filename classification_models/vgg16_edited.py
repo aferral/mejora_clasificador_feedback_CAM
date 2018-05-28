@@ -1,6 +1,7 @@
 import tensorflow as tf
 from datasets.dataset import Dataset
 from datasets.cifar10_data import Cifar10_Dataset
+from datasets.imagenet_data import Imagenet_Dataset
 from utils import show_graph, save_graph_txt
 
 from classification_models.classification_model import Abstract_model
@@ -40,7 +41,7 @@ def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
 
             # Here we have 14x14 filters
             net = tf.reduce_mean(net, [1, 2])  # Global average pooling
-            net = layers_lib.fully_connected(net, 1000, activation_fn=None, biases_initializer=None,
+            net = layers_lib.fully_connected(net, num_classes, activation_fn=None, biases_initializer=None,
                                              scope='softmax_logits')
 
             # Convert end_points_collection into a end_point dict.
@@ -51,7 +52,7 @@ def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
 class vgg_16_CAM(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False):
-        super().__init__(dataset, debug,'cifar10_classifier')
+        super().__init__(dataset, debug,'vgg16_classifier')
 
         self.reg_factor = 0.1
         self.lr = 0.001
@@ -62,12 +63,12 @@ class vgg_16_CAM(Abstract_model):
     def define_arch(self):
 
         # Define the model:
-        predictions, acts = get_slim_arch(self.input_l)
+        predictions, acts = get_slim_arch(self.input_l,self.dataset.shape_target[0])
 
         # Configure values for visualization
-        # todo configure HERE
-        self.last_conv = acts['vgg16/c']
-        self.softmax_weights = "softmax_layer/kernel:0"
+
+        self.last_conv = acts['vgg_16/conv5/conv5_3']
+        self.softmax_weights = "vgg_16/softmax_logits/kernel:0"
         self.pred = tf.nn.softmax(predictions, name='prediction')
 
         self.loss = tf.losses.softmax_cross_entropy(self.targets, predictions)
@@ -79,12 +80,13 @@ class vgg_16_CAM(Abstract_model):
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
 
-dataset = Cifar10_Dataset(2,40)
+if __name__ == '__main__':
+    dataset = Imagenet_Dataset(2,40)
 
-# todo muestra mal el grafo
-with vgg_16_CAM(dataset, debug=False) as model:
-    show_graph(tf.get_default_graph())
-    save_graph_txt(tf.get_default_graph())
-    graph = tf.get_default_graph()
-    writer = tf.summary.FileWriter(logdir='logdir', graph=graph)
-    writer.flush()
+
+    with vgg_16_CAM(dataset, debug=False) as model:
+        show_graph(tf.get_default_graph())
+        save_graph_txt(tf.get_default_graph())
+        graph = tf.get_default_graph()
+        writer = tf.summary.FileWriter(logdir='logdir', graph=graph)
+        writer.flush()
