@@ -84,23 +84,27 @@ export LD_LIBRARY_PATH=/home/aferral/cuda-9.0/lib64:$LD_LIBRARY_PATH
 
 hacer mas facil seteo de variables y entornos en pychar o lo que sea 
 
+isntale line profiler
+
+revisar el api de dataset nuevamente
+
 """
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
-    train=False
+    train=True
 
     # todo improve dataset get
-    # todo add submodules for tf_models
+    # todo operate with cmd??? or use gitignored script
     # start to work on mnist or VOC
 
     # dataset = Digits_Dataset(epochs=20,batch_size=30)
-    dataset = Cifar10_Dataset(20,40)
-    # dataset = Imagenet_Dataset(20,30)
+    # dataset = Cifar10_Dataset(20,40)
+    dataset = Imagenet_Dataset(1,30)
 
-    with vgg_16_CAM(dataset, debug=False) as model:
+    with vgg_16_CAM(dataset, debug=False,name='Imagenet_subset_vgg16_CAM') as model:
 
         if train:
             model.train()

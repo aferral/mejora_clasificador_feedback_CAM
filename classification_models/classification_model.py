@@ -107,7 +107,6 @@ class Abstract_model(ExitStack):
 
                     if i % 50 == 0:
                         print("It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100))
-                        exit(1)
                     i += 1
                 except tf.errors.OutOfRangeError:
                     print('break at {0}'.format(i))
