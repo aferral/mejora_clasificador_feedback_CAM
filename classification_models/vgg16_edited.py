@@ -68,7 +68,7 @@ class vgg_16_CAM(Abstract_model):
         # Configure values for visualization
 
         self.last_conv = acts['vgg_16/conv5/conv5_3']
-        self.softmax_weights = "vgg_16/softmax_logits/kernel:0"
+        self.softmax_weights = r"vgg_16/softmax_logits/weights:0"
         self.pred = tf.nn.softmax(predictions, name='prediction')
 
         self.loss = tf.losses.softmax_cross_entropy(self.targets, predictions)
