@@ -7,7 +7,7 @@ import os
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
-from utils import show_graph, now_string, timeit
+from utils import show_graph, now_string, timeit, do_profile
 
 
 class Abstract_model(ExitStack):
@@ -87,7 +87,7 @@ class Abstract_model(ExitStack):
         assert (not (self.pred is None)), 'Must define pred. Softmax prediction layer'
 
 
-
+    @do_profile()
     def train(self):
 
 
@@ -101,10 +101,13 @@ class Abstract_model(ExitStack):
             while True:
                 try:
                     fd = self.prepare_feed(is_train=True,debug=self.debug)
+
                     l, _, acc = self.sess.run([self.loss, self.train_step, self.accuracy], fd)
+
 
                     if i % 50 == 0:
                         print("It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100))
+                        exit(1)
                     i += 1
                 except tf.errors.OutOfRangeError:
                     print('break at {0}'.format(i))

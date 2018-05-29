@@ -51,8 +51,8 @@ def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
 
 class vgg_16_CAM(Abstract_model):
 
-    def __init__(self, dataset: Dataset, debug=False):
-        super().__init__(dataset, debug,'vgg16_classifier')
+    def __init__(self, dataset: Dataset, debug=False,name='vgg16_classifier'):
+        super().__init__(dataset, debug,name)
 
         self.reg_factor = 0.1
         self.lr = 0.001

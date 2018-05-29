@@ -80,12 +80,18 @@ class Imagenet_Dataset(Dataset):
             self.mean = np.load(mean_image_path)
 
         def preprocess(x,y):
-            return (tf.add(x, -self.mean),tf.one_hot(y,21))
+            return (tf.add(x, -self.mean) /255,tf.one_hot(y,21))
+
+        # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
+        # .cache()
+        #.map(preprocess,num_parallel_calls=4).batch(batch_size)
+        #.prefetch(1)
+        #.shuffle(10)
 
         # preprocesss
-        self.train_dataset = dataset_train.map(preprocess).shuffle(500).repeat(epochs).batch(batch_size).cache().prefetch(2000)
-        self.valid_dataset = dataset_val.map(preprocess).shuffle(500).repeat(epochs).batch(batch_size).cache().prefetch(2000)
-        self.dataset_test = dataset_test.map(preprocess).shuffle(500).repeat(epochs).batch(batch_size).cache().prefetch(2000)
+        self.train_dataset = dataset_train.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
+        self.valid_dataset = dataset_val.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
+        self.dataset_test = dataset_test.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
 
 
         # Create iterator
@@ -101,7 +107,7 @@ class Imagenet_Dataset(Dataset):
         :return:
         """
 
-        return image_batch - self.mean
+        return (image_batch - self.mean) /255
 
     @property
     def shape(self):
@@ -114,7 +120,7 @@ class Imagenet_Dataset(Dataset):
         sess = tf.get_default_session()
         temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
         batch_x, batch_y = sess.run(temp_iterator)
-        return batch_x + self.mean
+        return (batch_x * 255) + self.mean
 
     def get_data_range(self):
         return [0,255]
