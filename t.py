@@ -7,6 +7,7 @@ import os
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
 from classification_models.classification_model import imshow_util
 from classification_models.vgg16_edited import vgg_16_CAM
+from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
 from datasets.imagenet_data import Imagenet_Dataset
@@ -88,6 +89,8 @@ isntale line profiler
 
 revisar el api de dataset nuevamente
 
+Cuidaod con que repitan validation set
+
 """
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -102,9 +105,9 @@ if __name__ == '__main__':
 
     # dataset = Digits_Dataset(epochs=20,batch_size=30)
     # dataset = Cifar10_Dataset(20,40)
-    dataset = Imagenet_Dataset(1,30)
+    dataset = Imagenet_Dataset(20,30)
 
-    with vgg_16_CAM(dataset, debug=False,name='Imagenet_subset_vgg16_CAM') as model:
+    with vgg_16_batchnorm(dataset, debug=False,name='Imagenet_subset_vgg16_CAM') as model:
 
         if train:
             model.train()

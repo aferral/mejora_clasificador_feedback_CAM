@@ -90,8 +90,8 @@ class Imagenet_Dataset(Dataset):
 
         # preprocesss
         self.train_dataset = dataset_train.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
-        self.valid_dataset = dataset_val.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
-        self.dataset_test = dataset_test.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
+        self.valid_dataset = dataset_val.map(preprocess,num_parallel_calls=4).cache().repeat(1).batch(batch_size).prefetch(3)
+        self.dataset_test = dataset_test.map(preprocess,num_parallel_calls=4).cache().repeat(1).batch(batch_size).prefetch(3)
 
 
         # Create iterator

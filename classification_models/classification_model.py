@@ -87,7 +87,7 @@ class Abstract_model(ExitStack):
         assert (not (self.pred is None)), 'Must define pred. Softmax prediction layer'
 
 
-    @do_profile()
+    #@do_profile()
     def train(self):
 
 
