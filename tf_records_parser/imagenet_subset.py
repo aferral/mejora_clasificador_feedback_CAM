@@ -10,16 +10,22 @@ from skimage.io import imread
 #Based in https://github.com/balancap/SSD-Tensorflow/blob/master/datasets/pascalvoc_to_tfrecords.py
 
 
+config_path = 'imagenet_config.json'
+if not os.path.exists(config_path):
+    with open(config_path,'w') as f:
+        json.dump({"username" : "HERE_USERNAME","accessKey" : "Go to image-net.org/download-images if you dont have one"},f)
+    raise Exception("CONFIGURE FIRST imagenet_config.json in {0}".format(os.path.abspath(config_path)))
+else:
+    print("Trying to load imagenet_config. At {0}".format(os.path.abspath(config_path)))
+with open(config_path,'r') as f:
+    config_dict = json.load(f)
+    username = config_dict['username']
+    accessKey = config_dict['accessKey']
 
-# Go to image-net.org/download-images if you dont have one
-# TODO USE A CONFIG
-username = "aferral" # ------------------EDIT THIS WITH YOUR USERNAME - ACCESSKEY
-accessKey = "617eefaf3cfb20aff1c3dfde4c8d5260abf08e41" # -----------------EDIT THIS WITH YOUR USERNAME - ACCESSKEY
+    assert(not (username == "HERE_USERNAME"))," Edit the config_file"
+    assert(not (accessKey == "Go to image-net.org/download-images if you dont have one"))," Edit the config_file"
 
-assert(not (username is None))
-assert(not (accessKey is None))
-
-BASE_FOLDER = './ImageNet_Utils'
+BASE_FOLDER = os.getcwd()
 RANDOM_SEED = 1
 SAMPLES_PER_TFFILE = 1000
 
@@ -102,7 +108,8 @@ def get_image_folders():
 
 def download_subset(out_folder):
     # # Download images
-    for id_imagenet in subset.values():
+    for values in subset.values():
+        id_imagenet = values[1]
         downloader.downloadOriginalImages(id_imagenet, username, accessKey)
 
     # select n* folders
@@ -202,5 +209,5 @@ if __name__ == '__main__':
 
 
     print("Starting tfrecord conversion")
-    original_images_to_tfrecord(out_folder, out_tfrecods, shuffling=False)
+    original_images_to_tfrecord(out_folder, out_tfrecods, shuffling=True)
     print("Tfrecord conversion ended. Output at {0}".format(out_tfrecods))

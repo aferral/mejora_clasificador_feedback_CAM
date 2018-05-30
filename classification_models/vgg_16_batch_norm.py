@@ -14,7 +14,7 @@ from tensorflow.contrib import layers
 from tensorflow.contrib.framework.python.ops import arg_scope
 
 
-def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
+def get_slim_arch_bn(inputs,isTrainTensor,num_classes=1000,scope='vgg_16'):
     """
     from vgg16 https://github.com/tensorflow/models/blob/master/research/slim/nets/vgg.py
     :param inputs:
@@ -30,13 +30,21 @@ def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
         with arg_scope([layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
                        outputs_collections=end_points_collection):
             net = layers_lib.repeat(inputs, 2, layers.conv2d, 64, [3, 3], scope='conv1')
+            net = tf.contrib.layers.batch_norm(net,center=True, scale=True,is_training=isTrainTensor,scope='bn1')
             net = layers_lib.max_pool2d(net, [2, 2], scope='pool1')
+
             net = layers_lib.repeat(net, 2, layers.conv2d, 128, [3, 3], scope='conv2')
+            net = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn2')
             net = layers_lib.max_pool2d(net, [2, 2], scope='pool2')
+
             net = layers_lib.repeat(net, 3, layers.conv2d, 256, [3, 3], scope='conv3')
+            net = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn3')
             net = layers_lib.max_pool2d(net, [2, 2], scope='pool3')
+
             net = layers_lib.repeat(net, 3, layers.conv2d, 512, [3, 3], scope='conv4')
+            net = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn4')
             net = layers_lib.max_pool2d(net, [2, 2], scope='pool4')
+
             net = layers_lib.repeat(net, 3, layers.conv2d, 512, [3, 3], scope='conv5')
 
             # Here we have 14x14 filters
@@ -49,7 +57,7 @@ def get_slim_arch(inputs,num_classes=1000,scope='vgg_16'):
             return net, end_points
 
 
-class vgg_16_CAM(Abstract_model):
+class vgg_16_batchnorm(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False,name='vgg16_classifier'):
         super().__init__(dataset, debug,name)
@@ -58,12 +66,13 @@ class vgg_16_CAM(Abstract_model):
         self.lr = 0.001
 
     def get_feed_dict(self,isTrain):
-        return {}
+        return {"phase:0" : isTrain}
 
     def define_arch(self):
+        phase = tf.placeholder(tf.bool, name='phase')
 
         # Define the model:
-        predictions, acts = get_slim_arch(self.input_l,self.dataset.shape_target[0])
+        predictions, acts = get_slim_arch_bn(self.input_l,phase,self.dataset.shape_target[0])
 
         # Configure values for visualization
 
@@ -72,7 +81,10 @@ class vgg_16_CAM(Abstract_model):
         self.pred = tf.nn.softmax(predictions, name='prediction')
 
         self.loss = tf.losses.softmax_cross_entropy(self.targets, predictions)
-        self.train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss)
+
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss)
 
         # get accuracy
         prediction = tf.argmax(predictions, 1)

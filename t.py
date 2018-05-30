@@ -7,6 +7,7 @@ import os
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
 from classification_models.classification_model import imshow_util
 from classification_models.vgg16_edited import vgg_16_CAM
+from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
 from datasets.imagenet_data import Imagenet_Dataset
@@ -72,6 +73,24 @@ re_train
 - Dado un objeto dataset.
 
 
+Notas a mejorar
+- Uso de models slim???
+- Elegir requirement con o sin gpu?
+- Informacion importante tener muchos cudas
+sudo sh cuda-9.1.run --silent --toolkit --toolkitpath=/usr/local/cuda-9.0
+
+export PATH=/home/aferral/cuda-9.0/bin:$PATH ;
+export LD_LIBRARY_PATH=/home/aferral/cuda-9.0/lib64:$LD_LIBRARY_PATH
+
+
+hacer mas facil seteo de variables y entornos en pychar o lo que sea 
+
+isntale line profiler
+
+revisar el api de dataset nuevamente
+
+Cuidaod con que repitan validation set
+
 """
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -81,20 +100,21 @@ if __name__ == '__main__':
     train=True
 
     # todo improve dataset get
-    # todo add submodules for tf_models
+    # todo operate with cmd??? or use gitignored script
     # start to work on mnist or VOC
 
     # dataset = Digits_Dataset(epochs=20,batch_size=30)
-    #dataset = Cifar10_Dataset(2,40)
-    dataset = Imagenet_Dataset(1,10)
+    # dataset = Cifar10_Dataset(20,40)
+    dataset = Imagenet_Dataset(20,30)
 
-    with vgg_16_CAM(dataset, debug=False) as model:
+    with vgg_16_batchnorm(dataset, debug=False,name='Imagenet_subset_vgg16_CAM') as model:
 
         if train:
             model.train()
         else:
-            model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
+            # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
             #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
+            model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
             # model.eval()
 
 
