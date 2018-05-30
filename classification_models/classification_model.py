@@ -148,20 +148,25 @@ class Abstract_model(ExitStack):
         show_graph(graph)
 
     def eval(self):
+        from sklearn.metrics import confusion_matrix
+        from sklearn.metrics import accuracy_score
 
         self.dataset.initialize_iterator_val(self.sess)
 
-        avg_acc = 0
-        c = 0
+        y_true=[]
+        y_pred=[]
         while True:
             try:
                 fd = self.prepare_feed(is_train=False,debug=self.debug)
-                acc = self.sess.run([self.accuracy], fd)
-                avg_acc += acc[0]
-                c += 1
+                true,pred = self.sess.run([self.targets,self.pred], fd)
+                y_true.append(np.argmax(true,axis=1))
+                y_pred.append(np.argmax(pred,axis=1))
+
             except tf.errors.OutOfRangeError:
-                print(
-                    "Average validation set accuracy over {} iterations is {:.2f}%".format(c, (avg_acc / c) * 100))
+                y_true=np.hstack(y_true)
+                y_pred=np.hstack(y_pred)
+                print("Validation set accuracy over is {:.2f}%".format(accuracy_score(y_true,y_pred)))
+                print(confusion_matrix(y_true, y_pred))
                 break
 
 
