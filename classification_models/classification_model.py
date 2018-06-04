@@ -19,6 +19,8 @@ class Abstract_model(ExitStack):
         self.debug = debug
         self.save_folder=save_name
 
+    def get_name(self):
+        return self.save_folder
 
     def __enter__(self):
         assert (self.sess is None), "A session is already active"
@@ -69,8 +71,8 @@ class Abstract_model(ExitStack):
 
         if debug:
             x_batch, y_batch = self.sess.run(self.dataset.get_iterator_entry())
-            feed[self.input_l] = x_batch
-            feed[self.targets] = y_batch
+            feed[self.input_l.name] = x_batch
+            feed[self.targets.name] = y_batch
             return feed
         else:
             return feed
@@ -165,9 +167,11 @@ class Abstract_model(ExitStack):
             except tf.errors.OutOfRangeError:
                 y_true=np.hstack(y_true)
                 y_pred=np.hstack(y_pred)
-                print("Validation set accuracy over is {:.2f}%".format(accuracy_score(y_true,y_pred)))
+                print("Validation set accuracy is {:.2f}%".format(accuracy_score(y_true,y_pred)))
                 print(confusion_matrix(y_true, y_pred))
                 break
+
+
 
 
     def visualize(self,image):
@@ -183,12 +187,11 @@ class Abstract_model(ExitStack):
         img_proc,conv_acts, softmax_w, pred = self.feed_forward_vis(image)
 
         conv_acts = conv_acts[0]
-        print("conv_acts.shape: {0}".format(conv_acts.shape) )
-        print("softmax_w.shape: {0}".format(softmax_w.shape))
-        print("pred.shape: {0}".format(pred.shape))
-
-
-        print("Prediciont {0}".format(pred[0]))
+        # print("conv_acts.shape: {0}".format(conv_acts.shape) )
+        # print("softmax_w.shape: {0}".format(softmax_w.shape))
+        # print("pred.shape: {0}".format(pred.shape))
+        #
+        # print("Prediciont {0}".format(pred[0]))
         n_classes = pred.shape[1]
         out_maps_per_class = np.zeros((n_classes,conv_acts.shape[0],conv_acts.shape[0]))
 
@@ -266,7 +269,6 @@ class cifar10_classifier(Abstract_model):
 
     def define_arch(self):
 
-        # inp_reshaped = tf.reshape(self.input_l, [-1, 8, 8, 1])
         r_input = tf.cast(self.input_l, tf.float32)
         conv1 = tf.layers.conv2d(r_input, 30, (3, 3), padding='same', activation=tf.nn.relu,
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
@@ -283,6 +285,52 @@ class cifar10_classifier(Abstract_model):
         global_average_pool = tf.reduce_mean(conv3, [1, 2])
 
         out = tf.layers.dense(global_average_pool, 10, use_bias=False,
+                              kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                              kernel_regularizer=tf.contrib.layers.l2_regularizer(self.reg_factor), name='softmax_layer')
+
+        # Configure values for visualization
+        self.last_conv = conv3
+        self.softmax_weights = "softmax_layer/kernel:0"
+        self.pred = tf.nn.softmax(out, name='prediction')
+
+        self.loss = tf.losses.softmax_cross_entropy(self.targets, out)
+        self.train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(self.loss)
+
+        # get accuracy
+        prediction = tf.argmax(out, 1)
+        equality = tf.equal(prediction, tf.argmax(self.targets, 1))
+        self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
+
+
+class CWR_classifier(Abstract_model):
+
+    def __init__(self, dataset: Dataset, debug=False):
+        super().__init__(dataset, debug,'CWR_Clasifier')
+
+        self.reg_factor = 0.1
+        self.lr = 0.001
+
+    def get_feed_dict(self,isTrain):
+        return {}
+
+    def define_arch(self):
+
+        # inp_reshaped = tf.reshape(self.input_l, [-1, 8, 8, 1])
+        conv1 = tf.layers.conv2d(self.input_l, 30, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
+        pool1 = tf.layers.max_pooling2d(conv1, (2, 2), (2, 2))
+
+        conv2 = tf.layers.conv2d(pool1, 40, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
+        pool2 = tf.layers.max_pooling2d(conv2, (2, 2), (2, 2))
+
+        conv3 = tf.layers.conv2d(pool2, 50, (3, 3), padding='same', activation=tf.nn.relu,
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer()
+                                 ,name='last_conv_act')
+
+        global_average_pool = tf.reduce_mean(conv3, [1, 2])
+
+        out = tf.layers.dense(global_average_pool, 4, use_bias=False,
                               kernel_initializer=tf.contrib.layers.xavier_initializer(),
                               kernel_regularizer=tf.contrib.layers.l2_regularizer(self.reg_factor), name='softmax_layer')
 

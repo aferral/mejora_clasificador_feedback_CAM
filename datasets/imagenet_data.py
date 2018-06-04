@@ -109,6 +109,10 @@ class Imagenet_Dataset(Dataset):
 
         return (image_batch - self.mean) /255
 
+    def inverse_preprocess(self,image_batch):
+        return (image_batch * 255) + self.mean
+
+
     @property
     def shape(self):
         return IMAGE_SHAPE
@@ -120,7 +124,7 @@ class Imagenet_Dataset(Dataset):
         sess = tf.get_default_session()
         temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
         batch_x, batch_y = sess.run(temp_iterator)
-        return (batch_x * 255) + self.mean
+        return self.inverse_preprocess(batch_x )
 
     def get_data_range(self):
         return [0,255]

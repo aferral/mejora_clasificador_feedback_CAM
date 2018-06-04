@@ -3,26 +3,7 @@ import numpy as np
 import tensorflow as tf
 import os
 
-"""
-- Inverse transform??
-- index each image for reference????
 
-
-Vis_analysis():
-    for batch in train_data:
-        if batch_l != pred(batch_x):
-            append(wrong_img,pred_label,real_label)
-    
-    print number of wrong
-    print distribution over real classes
-    print distributio over pred classes
-    
-    interactive(show x)
-    show image,image_proc,CAM_real_class,CAM_pred_class
-    
-    save wrong dataset for posterior usage (name of saved model, ask for name)
-
-"""
 
 class Dataset:
     def __init__(self):
@@ -33,6 +14,9 @@ class Dataset:
         assert (not (self.valid_dataset is None)), "Dataset must define a validation_dataset"
 
     def preprocess_batch(self,image_batch):
+        raise NotImplementedError()
+
+    def inverse_preprocess(self,image_batch):
         raise NotImplementedError()
 
     def get_iterator_entry(self):

@@ -96,7 +96,7 @@ if __name__ == '__main__':
     dataset = Imagenet_Dataset(2,40)
 
 
-    with vgg_16_CAM(dataset, debug=False) as model:
+    with vgg_16_batchnorm(dataset, debug=False) as model:
         show_graph(tf.get_default_graph())
         save_graph_txt(tf.get_default_graph())
         graph = tf.get_default_graph()
