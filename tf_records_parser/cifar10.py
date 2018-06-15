@@ -67,12 +67,14 @@ def convert_to_tfrecord(input_file_list,output_file):
             width = 32
             depth = 3
             img_raw = img_flat.tostring()
+            index = '{0} -- {1}'.format(os.path.split(file)[-1],row)
             example = tf.train.Example(features=tf.train.Features(feature={
                 'height': _int64_feature(height),
                 'width': _int64_feature(width),
                 'depth': _int64_feature(depth),
                 'image_raw': _bytes_feature(img_raw),
-                'label': _int64_feature(label)}))
+                'label': _int64_feature(label),
+                'index' : _bytes_feature(tf.compat.as_bytes(index))}))
             writer.write(example.SerializeToString())
     writer.close()
 

@@ -9,7 +9,8 @@ def parse_function(example_proto):
                 "label": tf.FixedLenFeature((), tf.int64),
                 "height": tf.FixedLenFeature((), tf.int64),
                 "width": tf.FixedLenFeature((), tf.int64),
-                "depth": tf.FixedLenFeature((), tf.int64)
+                "depth": tf.FixedLenFeature((), tf.int64),
+                "img_path": tf.FixedLenFeature((), tf.string)
                 }
     parsed_features = tf.parse_single_example(example_proto, features)
     h, w, d = parsed_features['height'], parsed_features['width'], parsed_features['depth']
@@ -17,7 +18,7 @@ def parse_function(example_proto):
     flat_image = tf.decode_raw(parsed_features["image_raw"], tf.float64)
     reconst = tf.cast(tf.transpose(tf.reshape(flat_image, tf.stack([d, h, w])), [1, 2, 0], 'reconstructed_image'),tf.float32)
 
-    return reconst, parsed_features["label"]
+    return parsed_features["img_path"],reconst, parsed_features["label"]
 
 def get_records_folder():
     return  os.path.join(LOCAL_FOLDER, "CWR_records")
@@ -35,7 +36,7 @@ def list_records():
 class CWR_Dataset(Dataset):
 
 
-    def __init__(self,epochs,batch_size):
+    def __init__(self,epochs,batch_size,**kwargs):
 
         tfrecords = list_records()
 
@@ -66,7 +67,7 @@ class CWR_Dataset(Dataset):
 
             try:
                 while True:
-                    batch_x, batch_y = sess.run(temp_iterator)
+                    indexs,batch_x, batch_y = sess.run(temp_iterator)
                     p_mean = p_mean + np.mean(batch_x,axis=0) #(96,96,1)
                     c+=1
             except tf.errors.OutOfRangeError:
@@ -77,8 +78,8 @@ class CWR_Dataset(Dataset):
             print("Mean image loaded from file")
             self.mean = np.load(mean_image_path)
 
-        def preprocess(x,y):
-            return (tf.add(x, -self.mean) /255,tf.one_hot(y,4))
+        def preprocess(indexs,x,y):
+            return (indexs,tf.add(x, -self.mean) /255,tf.one_hot(y,4))
 
         # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
         # .cache()
@@ -97,7 +98,7 @@ class CWR_Dataset(Dataset):
                                                                    self.train_dataset.output_shapes)
 
         # check parameters
-        super().__init__()
+        super().__init__(**kwargs)
 
     def inverse_preprocess(self,image_batch):
         return image_batch*255 + self.mean

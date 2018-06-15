@@ -10,7 +10,6 @@ from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset
 from datasets.imagenet_data import Imagenet_Dataset
 import matplotlib.pyplot as plt
-from skimage.transform import resize
 
 from skimage.transform import resize
 from skimage.util import invert
@@ -162,7 +161,7 @@ def exp_CAM_eval(dataset,classifier,out_folder):
                 for ind,image in enumerate(im_batch):
                     norm_cam = (cam_maps[ind] - cam_maps[ind].min()) / (cam_maps[ind].max() - cam_maps[ind].min())
                     norm_cam = (norm_cam * 2) - 1 # to -1 +1 range
-                    norm_cam = resize(norm_cam, mask_dim)
+                    norm_cam = resize(norm_cam, mask_dim,mode='constant')
 
                     binary_mask = norm_cam > 0.6
 
@@ -229,8 +228,8 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
                 fd = model.prepare_feed(is_train=False, debug=False)
 
                 # Calc prediction, target, conv_acts
-                tensors=[model.input_l,model.last_conv, model.softmax_weights, model.targets, model.pred]
-                images,conv_acts,softmax_w,y_real ,y_pred = model.sess.run(tensors, fd)
+                tensors=[model.indexs,model.input_l,model.last_conv, model.softmax_weights, model.targets, model.pred]
+                indexs,images,conv_acts,softmax_w,y_real ,y_pred = model.sess.run(tensors, fd)
 
                 pred_class = np.argmax(y_pred,axis=1)
                 pred_values = np.max(y_pred,axis=1)
@@ -258,21 +257,21 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
                         out_shape = out_shape[0:2]
 
                     cam_img = imshow_util(cam_maps[ind],[cam_maps[ind].min(),cam_maps[ind].max()])
-                    resized_map = resize(cam_img,out_shape)
+                    resized_map = resize(cam_img,out_shape,mode='constant')
 
                     fig, ax = plt.subplots()
                     ax.set_title("Predicted {0} with score {1}".format(p_class,pred_values[ind]))
                     ax.imshow(resized_map, cmap='jet',alpha=0.5)
                     ax.imshow(test_image_plot,alpha=0.5,cmap='gray')
 
-                    img_out_path = os.path.join(imgs_f,"{0}.png".format(counter))
+                    img_out_path = os.path.join(imgs_f,"{0}.png".format(indexs[ind]))
                     plt.savefig(img_out_path)
                     if (counter % 100 == 0):
                         print("Image {0}".format(counter))
                     counter+=1
 
 
-            except Exception as err:
+            except tf.errors.OutOfRangeError as err:
                 print("Ended")
                 break
 
@@ -328,7 +327,7 @@ if __name__ == '__main__':
 
         # model.load('.','model/Imagenet_subset_vgg16_CAM/29_May_2018__15_16')
         # model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
-        model.load('./model/check.meta','./model/CWR_Clasifier/04_Jun_2018__12_41')
+        model.load('./model/CWR_Clasifier/14_Jun_2018__13_36')
 
-        exp_CAM_eval(dataset, model,out_path_folder)
+        # exp_CAM_eval(dataset, model,out_path_folder)
         visualize_dataset_CAM_predicted(dataset, model, out_path_folder)

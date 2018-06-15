@@ -16,7 +16,7 @@ def grayscaleEq(rgbimage):
     return rgbimage[:,:,0] * cof + rgbimage[:,:,1] * cof + rgbimage[:,:,2] * cof
 
 
-def write_to_tfrecord(numpy_array,label,writer):
+def write_to_tfrecord(numpy_array,label,img_path,writer):
     img_flat = numpy_array.flatten()
     height = 96
     width = 96
@@ -27,7 +27,9 @@ def write_to_tfrecord(numpy_array,label,writer):
         'width': _int64_feature(width),
         'depth': _int64_feature(depth),
         'image_raw': _bytes_feature(img_raw),
-        'label': _int64_feature(label)}))
+        'label': _int64_feature(label),
+        'img_path' : _bytes_feature(tf.compat.as_bytes(img_path))
+    }))
     writer.write(example.SerializeToString())
 
 def cwr_to_tfrecord(dataFolder,output_dir,shuffling=True):
@@ -71,8 +73,9 @@ def cwr_to_tfrecord(dataFolder,output_dir,shuffling=True):
             j = 0
             while i < len(all) and j < SAMPLES_PER_TFFILE:
                 gray_img = all[i]
+                img_filename = fileList[i]
                 label = allL[i]
-                write_to_tfrecord(gray_img, label, tfrecord_writer)
+                write_to_tfrecord(gray_img, label,img_filename, tfrecord_writer)
                 i += 1
                 j += 1
 
@@ -83,4 +86,14 @@ def cwr_to_tfrecord(dataFolder,output_dir,shuffling=True):
 
 
 if __name__ == "__main__":
-    cwr_to_tfrecord("./temp/CW96Scalograms",'./temp/CWR_records/')
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Calculate tf records from cwr images')
+    parser.add_argument('folderIn', metavar='dataset_folder',
+                        help='Where are the CWR images')
+    parser.add_argument('folderOut', metavar='out_folder',
+                        help='Where will be the tf records stored')
+
+    args = parser.parse_args()
+
+    cwr_to_tfrecord(args.folderIn, args.folderOut, shuffling=True)

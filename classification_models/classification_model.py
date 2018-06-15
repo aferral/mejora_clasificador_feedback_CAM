@@ -23,8 +23,11 @@ class Abstract_model(ExitStack):
         return self.save_folder
 
     def __enter__(self):
-        assert (self.sess is None), "A session is already active"
-        self.sess = tf.Session()
+
+        if tf.get_default_session():
+            self.sess = tf.get_default_session()
+        else:
+            self.sess = tf.Session()
 
         super().__enter__()
         self.enter_context(self.sess.as_default())
@@ -36,13 +39,15 @@ class Abstract_model(ExitStack):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sess.close()
+        super().__exit__(exc_type, exc_val, exc_tb)
 
     def define_arch_base(self):
 
         # Define the inputs
         next_element = self.dataset.get_iterator_entry()
-        input_l = self.input_l =  tf.placeholder_with_default(next_element[0], shape=[None]+self.dataset.shape, name='model_input')
-        targets = self.targets =  tf.placeholder_with_default(next_element[1], shape=[None]+self.dataset.shape_target, name='target')
+        indexs = self.indexs = tf.placeholder_with_default(next_element[0], shape=next_element[0].shape, name='indexs_input')
+        input_l = self.input_l = tf.placeholder_with_default(next_element[1], shape=[None]+self.dataset.shape, name='model_input')
+        targets = self.targets = tf.placeholder_with_default(next_element[2], shape=[None]+self.dataset.shape_target, name='target')
 
         self.define_arch()
         self.check_arch()
@@ -70,7 +75,8 @@ class Abstract_model(ExitStack):
         feed = self.get_feed_dict(is_train)
 
         if debug:
-            x_batch, y_batch = self.sess.run(self.dataset.get_iterator_entry())
+            inds,x_batch, y_batch = self.sess.run(self.dataset.get_iterator_entry())
+            feed[self.indexs] = inds
             feed[self.input_l.name] = x_batch
             feed[self.targets.name] = y_batch
             return feed
@@ -126,6 +132,8 @@ class Abstract_model(ExitStack):
         os.makedirs(path_model_checkpoint,exist_ok=True)
         saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
 
+        return path_model_checkpoint
+
 
     def feed_forward_vis(self,image):
         image = self.dataset.preprocess_batch(image)
@@ -140,7 +148,7 @@ class Abstract_model(ExitStack):
 
         return image,conv_acts, softmax_w, pred
 
-    def load(self,metagrap_path,model_folder):
+    def load(self, model_folder):
 
 
         new_saver = tf.train.Saver()

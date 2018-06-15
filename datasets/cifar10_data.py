@@ -9,7 +9,8 @@ def parse_function(example_proto):
                 "label": tf.FixedLenFeature((), tf.int64),
                 "height": tf.FixedLenFeature((), tf.int64),
                 "width": tf.FixedLenFeature((), tf.int64),
-                "depth": tf.FixedLenFeature((), tf.int64)
+                "depth": tf.FixedLenFeature((), tf.int64),
+                "index": tf.FixedLenFeature((), tf.string)
                 }
     parsed_features = tf.parse_single_example(example_proto, features)
     h, w, d = parsed_features['height'], parsed_features['width'], parsed_features['depth']
@@ -17,13 +18,13 @@ def parse_function(example_proto):
     flat_image = tf.decode_raw(parsed_features["image_raw"], tf.uint8)
     reconst = tf.cast(tf.transpose(tf.reshape(flat_image, tf.stack([d, h, w])), [1, 2, 0], 'reconstructed_image'),tf.float32)
 
-    return reconst, parsed_features["label"]
+    return parsed_features["index"],reconst, parsed_features["label"]
 
 
 class Cifar10_Dataset(Dataset):
 
 
-    def __init__(self,epochs,batch_size):
+    def __init__(self,epochs,batch_size,**kwargs):
 
         train_records = os.path.join(LOCAL_FOLDER,'train.tfrecords')
         validation_records = os.path.join(LOCAL_FOLDER, 'validation.tfrecords')
@@ -45,7 +46,7 @@ class Cifar10_Dataset(Dataset):
 
             try:
                 while True:
-                    batch_x, batch_y = sess.run(temp_iterator)
+                    index,batch_x, batch_y = sess.run(temp_iterator)
                     p_mean = p_mean + np.mean(batch_x,axis=0) #(32,32,3)
                     c+=1
             except tf.errors.OutOfRangeError:
@@ -56,8 +57,8 @@ class Cifar10_Dataset(Dataset):
             print("Mean image loaded from file")
             self.mean = np.load(mean_image_path)
 
-        def preprocess(x,y):
-            return (tf.add(x, -self.mean),tf.one_hot(y,10))
+        def preprocess(index,x,y):
+            return (index,tf.add(x, -self.mean),tf.one_hot(y,10))
 
         # preprocesss
         self.train_dataset = dataset_train.map(preprocess).shuffle(500).repeat(epochs).batch(batch_size).cache().prefetch(2000)
@@ -70,7 +71,7 @@ class Cifar10_Dataset(Dataset):
                                                                    self.train_dataset.output_shapes)
 
         # check parameters
-        super().__init__()
+        super().__init__(**kwargs)
 
     def inverse_preprocess(self,image_batch):
         return image_batch + self.mean

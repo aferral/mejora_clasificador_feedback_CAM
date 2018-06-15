@@ -97,7 +97,7 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
-    train=True
+    train=False
 
     # todo improve dataset get
     # todo operate with cmd??? or use gitignored script
@@ -114,8 +114,9 @@ if __name__ == '__main__':
         else:
             # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
             #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
-            model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
-            # model.eval()
+            model.load('./model/Imagenet_subset_vgg16_CAM/29_May_2018__15_16')
+            model.eval()
+            exit(1)
 
 
             test_image = dataset.get_train_image_at(0)[0]

@@ -85,8 +85,6 @@ def _add_to_tfrecord(filename, label_name,label_index, tfrecord_writer):
 
     shape = im.size
 
-    # todo resize????
-
     image_format = b'JPEG'
     example = tf.train.Example(features=tf.train.Features(feature={
             'image/height': int64_feature(shape[0]),
@@ -95,6 +93,7 @@ def _add_to_tfrecord(filename, label_name,label_index, tfrecord_writer):
             'image/shape': int64_feature(list(shape)),
             'image/label': int64_feature(label_index),
             'image/label_text': bytes_feature(label_name.encode('ascii')),
+            'index': bytes_feature(tf.compat.as_bytes(os.path.split(filename)[-1])),
             'image/format': bytes_feature(image_format),
             'image/encoded': bytes_feature(image_data)}))
 
@@ -204,7 +203,7 @@ if __name__ == '__main__':
 
 
     print("Downloading images from IMAGENET")
-    # download_subset(out_folder)
+    download_subset(out_folder)
     print("Download ended. Outfolder: {0}".format(out_folder))
 
 

@@ -38,7 +38,7 @@ def list_records():
 
 class Imagenet_Dataset(Dataset):
 
-    def __init__(self,epochs,batch_size):
+    def __init__(self,epochs,batch_size,**kwargs):
         tfrecords = list_records()
 
         train_n_records = 26
@@ -99,7 +99,7 @@ class Imagenet_Dataset(Dataset):
                                                                    self.train_dataset.output_shapes)
 
         # check parameters
-        super().__init__()
+        super().__init__(**kwargs)
 
     def preprocess_batch(self,image_batch):
         """
