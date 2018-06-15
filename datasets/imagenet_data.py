@@ -11,7 +11,9 @@ def parse_function(example_proto):
                 "image/label": tf.FixedLenFeature((), tf.int64),
                 "image/height": tf.FixedLenFeature((), tf.int64),
                 "image/width": tf.FixedLenFeature((), tf.int64),
-                "image/channels": tf.FixedLenFeature((), tf.int64)
+                "image/channels": tf.FixedLenFeature((), tf.int64),
+                "index": tf.FixedLenFeature((), tf.string)
+
                 }
     parsed_features = tf.parse_single_example(example_proto, features)
 
@@ -22,7 +24,7 @@ def parse_function(example_proto):
 
     reconst = tf.cast(reconst,tf.float32,name='image_reshaped')
 
-    return reconst, parsed_features["image/label"]
+    return parsed_features["index"],reconst, parsed_features["image/label"]
 
 def get_records_folder():
     return  os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset")
@@ -40,11 +42,12 @@ class Imagenet_Dataset(Dataset):
 
     def __init__(self,epochs,batch_size,**kwargs):
         tfrecords = list_records()
-
-        train_n_records = 26
-        val_n_records = 2
-        test_n_records = 2
         n_records = len(tfrecords)
+
+        train_n_records = int(0.8*n_records)
+        val_n_records = int(0.1*n_records)
+        test_n_records = n_records - train_n_records - val_n_records
+
 
         assert(train_n_records+val_n_records+test_n_records == n_records),"The train-val-test split must use all tf records."
 
@@ -68,7 +71,7 @@ class Imagenet_Dataset(Dataset):
 
             try:
                 while True:
-                    batch_x, batch_y = sess.run(temp_iterator)
+                    index,batch_x, batch_y = sess.run(temp_iterator)
                     p_mean = p_mean + np.mean(batch_x,axis=0) # IMAGE_SHAPE
                     c+=1
             except tf.errors.OutOfRangeError:
@@ -79,8 +82,8 @@ class Imagenet_Dataset(Dataset):
             print("Mean image loaded from file")
             self.mean = np.load(mean_image_path)
 
-        def preprocess(x,y):
-            return (tf.add(x, -self.mean) /255,tf.one_hot(y,21))
+        def preprocess(index,x,y):
+            return (index,tf.add(x, -self.mean) /255,tf.one_hot(y,21))
 
         # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
         # .cache()

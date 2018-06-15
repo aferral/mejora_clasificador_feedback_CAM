@@ -59,6 +59,7 @@ subset = {
 }
 
 
+
 def int64_feature(value):
     if not isinstance(value, list):
         value = [value]
@@ -191,6 +192,7 @@ if __name__ == '__main__':
 
     out_folder = './temp/imagenet_subset'
     out_tfrecods = './temp/tfrecords_imagenet_subset/'
+
 
 
     print("This function will download a IMAGENET subset (may take a lot of time). ")
