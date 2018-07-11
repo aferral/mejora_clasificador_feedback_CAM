@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import tensorflow as tf
 import os
@@ -259,13 +260,25 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
                     cam_img = imshow_util(cam_maps[ind],[cam_maps[ind].min(),cam_maps[ind].max()])
                     resized_map = resize(cam_img,out_shape,mode='constant')
 
-                    fig, ax = plt.subplots()
-                    ax.set_title("Predicted {0} with score {1}".format(p_class,pred_values[ind]))
-                    ax.imshow(resized_map, cmap='jet',alpha=0.5)
-                    ax.imshow(test_image_plot,alpha=0.5,cmap='gray')
 
-                    img_out_path = os.path.join(imgs_f,"{0}.png".format(indexs[ind]))
-                    plt.savefig(img_out_path)
+                    # Blend the visualization and the image with cv2
+                    heatmap_jet = cv2.applyColorMap((resized_map*255).astype(np.uint8), cv2.COLORMAP_JET)
+                    if len(test_image_plot.shape) == 2 or test_image_plot.shape[2] == 1:
+                        rgb_grayscale = cv2.cvtColor((test_image_plot*255).astype(np.uint8),cv2.COLOR_GRAY2RGB)
+                        dest = cv2.addWeighted(rgb_grayscale, 0.7, heatmap_jet, 0.3, 0, dtype=3)
+                    else:
+                        dest = cv2.addWeighted((test_image_plot*255).astype(np.uint8), 0.7, heatmap_jet, 0.3, 0,dtype=3)
+
+                    # format name
+                    f_name = indexs[ind].decode() if type(indexs[ind]) == bytes else indexs[ind]
+                    f_name = f_name if type(f_name) == str else str(f_name)
+                    f_name = f_name.split('.')[0] if '.' in f_name else f_name # Sometimes the index is a file path
+
+                    out_img = "index_{1}_prob_{0}.png".format(int(pred_values[ind]*100),f_name)
+
+                    img_out_path = os.path.join(imgs_f,out_img)
+                    cv2.imwrite(img_out_path,dest)
+
                     if (counter % 100 == 0):
                         print("Image {0}".format(counter))
                     counter+=1
