@@ -5,10 +5,12 @@ import numpy as np
 import os
 
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
-from classification_models.classification_model import imshow_util
+from classification_models.classification_model import imshow_util, \
+    CWR_classifier
 from classification_models.vgg16_edited import vgg_16_CAM
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
+from datasets.cwr_dataset import CWR_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
 from datasets.imagenet_data import Imagenet_Dataset
 from utils import show_graph, now_string, timeit
@@ -91,6 +93,12 @@ revisar el api de dataset nuevamente
 
 Cuidaod con que repitan validation set
 
+IMPORTANTE PENSAR ACERCA DE CAMBIAR DATOS DE TF RECORDS Y SOLO USAR TFRECORD para entrenar????
+
+todo mecanizar download cwr
+
+TODO revisar como llevar a tf recrods CWR bien (multiplica size 10 veces)
+
 """
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -101,6 +109,7 @@ if __name__ == '__main__':
 
     # todo improve dataset get
     # todo operate with cmd??? or use gitignored script
+    # todo mecanizar el with a algo mas facil de reproducir
     # start to work on mnist or VOC
 
     # dataset = Digits_Dataset(epochs=20,batch_size=30)
@@ -114,9 +123,8 @@ if __name__ == '__main__':
         else:
             # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
             #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
-            model.load('./model/Imagenet_subset_vgg16_CAM/29_May_2018__15_16')
-            model.eval()
-            exit(1)
+            model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
+            # model.eval()
 
 
             test_image = dataset.get_train_image_at(0)[0]

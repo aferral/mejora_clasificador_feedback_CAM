@@ -11,10 +11,46 @@ Esta herramienta selecciona trozos en imagenes
 
 # botones SIG, ANTERIOR,
 
+MODULOS
+
+Modulo central requiere config-file con path a (dataset, model)
+-- Al iniciar carga algunas imagenes, modelo0
+-- Se preocupa de cargar mascara binario por defecto o a armar una
+-- Carga lista de indices y manda a modulo
+-- Carga lista de mascaras y revisa que indices estan asociados
+
+
+1. Modulo carga de modelo(carpeta_models -- config_file?? ajustar tupla dataset - model)
+    -- SOlo hace de interfaz visual respecto a carga de modulo central
+    -- Lista de tuplas dataset,modelo
+
+2. Modulo muestra imagen - cam - select (img,img_cam,mascar_si_existe)
+    -- Si detecta cambio en mascara hace callback de update y eso lo ve central
+
+3. Ajuste de parametros
+
+
+4. Lista de indices o batch. Muestra si esta asignada mascara
+    -- Solamente muestra lista y actua de callback a central
+
+
+5. Seleccion de donde guardar o abrir archivo de mascaras
+    -- Muestra lista de archivos de mascara
+    -- Actua de callback al seleccionar uno
+
+
+1. Tener claro que va pasar con los indices y datasets
+Creo que todos los dataset deberia tenre
+    -- List indexs
+    -- Get index especifico
+
 
 TODO:
 - MANEJAR FACTOR de resize de imagen en interfaz
 - Manejar movimiento entre imagen con teclas??
+
+
+
 
 """
 
