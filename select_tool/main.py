@@ -56,9 +56,14 @@ TODO:
 
 
 # todo revisar tipos de objetos
+# todo dummizar modelo da datos
+# todo arreglar select a objeto de imagen
 # todo requiero limpiar un modelo no en uso ????
 from tkinter import Widget, Frame, Toplevel, Label, Entry, Button
 from tkinter import Tk, Listbox, END, mainloop
+import numpy as np
+from tkinter import LEFT
+
 
 class selected_model_obj:
     def __init__(self):
@@ -72,10 +77,10 @@ class selected_model_obj:
         self.dataset_obj = None
 
         self.current_index = all_indexs[0]
-        self.index_list = None
+        self.index_list = all_indexs
         self.current_mask_file = None
         self.current_mask_list = []
-        self.mask_file_list = None
+        self.mask_file_list = ['mascaras_f1','mascaras_f2','mascaras_f3']
 
     def get_current_index(self):
         return self.current_index
@@ -111,6 +116,7 @@ class selected_model_obj:
     def get_img_index(self, index):
         # check if index existe in index_list
         assert(index in self.index_list)
+        return np.random.rand(10,0)
         return self.dataset_obj.get_index(index)
 
     def get_img_cam(self, index):
@@ -131,23 +137,30 @@ class selected_model_obj:
 class mask_select(Frame):
     def __init__(self,controller,current_model : selected_model_obj,master,*args,**kwargs):
         self.controller = controller
-        self.update_model(current_model)
+
 
         super().__init__(master, *args, **kwargs)
-        listbox = Listbox(self)
-        listbox.pack()
+        self.listbox = Listbox(self, exportselection=False)
+        self.listbox.pack()
+        Label(self,text="New mask file: ").pack()
+        Entry(self).pack()
+        Button(self,text='Create').pack()
 
-        listbox.insert(END, "LISTA_MASK_SELECT")
+        self.update_model(current_model)
 
-        for item in ["one", "two", "thr"
-                                   "ee", "four"]:
-            listbox.insert(END, item)
+
+
 
     def update_model(self, current_model):
         self.model = current_model
         self.mask_file_list = self.model.get_mask_file_list()
         self.current_mask_file=self.model.get_current_mask_file()
 
+        self.listbox.delete(0, END)
+        for item in self.mask_file_list:
+            self.listbox.insert(END, item)
+        self.listbox.select_set(0)
+        self.listbox.event_generate("<<ListboxSelect>>")
 
     def selection(self):
         selected = None
@@ -163,18 +176,40 @@ class index_select(Frame):
     def __init__(self,controller,current_model,master,*args,**kwargs):
         self.controller = controller
 
-        self.update_model(current_model)
+
 
         #dibujar widget
         super().__init__(master, *args, **kwargs)
-        listbox = Listbox(self)
-        listbox.pack()
 
-        listbox.insert(END, "LISTA_INDEX_SELECT")
+        f_st=Frame(self)
+        Label(f_st,text="Current_index: ").pack()
+        Label(f_st, text="Current_filter: ").pack()
+        f_st.pack()
 
-        for item in ["one", "two", "thr"
-                                   "ee", "four"]:
-            listbox.insert(END, item)
+        self.listbox = Listbox(self, exportselection=False)
+        self.listbox.pack()
+
+
+        f=Frame(self)
+        Label(f,text="Filtro: ").pack(side=LEFT)
+        Entry(f).pack(side=LEFT)
+        f.pack()
+
+        f2=Frame(self)
+        Button(f2, text='Filter').pack(side=LEFT)
+        Button(f2,text='Clean Filter').pack(side=LEFT)
+        f2.pack()
+
+        f3=Frame(self)
+        Button(self, text='<<').pack(side=LEFT)
+        Button(self, text='>>').pack(side=LEFT)
+        f3.pack()
+
+        self.update_model(current_model)
+        self.listbox.select_set(0)
+        self.listbox.event_generate("<<ListboxSelect>>")
+
+
 
     def update_model(self, current_model):
         self.model = current_model
@@ -182,6 +217,10 @@ class index_select(Frame):
         self.current_index = self.model.get_current_index()
         self.mask_list = self.model.get_mask_list()
 
+
+        self.listbox.delete(0, END)
+        for item in self.index_list:
+            self.listbox.insert(END, item)
 
 
     def selection(self):
@@ -213,8 +252,8 @@ class img_select(Frame):
         Entry(self).grid(row=1, column=1)
         Entry(self).grid(row=1, column=2)
 
-        Button(self, text="Delete").grid(row=2, column=0)
-        Button(self, text="Save").grid(row=2, column=1)
+        Button(self, text="Delete mask").grid(row=2, column=0)
+        Button(self, text="Save mask").grid(row=2, column=1)
 
 
 
@@ -246,20 +285,22 @@ class model_select(Frame):
 
         # Dibujar widget
         super().__init__(master, *args, **kwargs)
-        listbox = Listbox(self)
-        listbox.pack()
+        self.listbox = Listbox(self, exportselection=False)
+        self.listbox.bind('<<ListboxSelect>>', self.selection)
+        self.listbox.pack()
 
-        listbox.insert(END, "a list entry")
+        for item in self.model_list:
+            self.listbox.insert(END, item)
 
-        for item in ["one", "two", "thr"
-                                   "ee", "four"]:
-            listbox.insert(END, item)
+        self.listbox.select_set(0)
+        self.listbox.event_generate("<<ListboxSelect>>")
 
-    def selection(self):
+    def selection(self,x):
+        print(x)
         selected = None
 
         # Send message to interface to load another model
-        self.controller.event_change_model(selected)
+        # self.controller.event_change_model(selected)
         pass
 
 
@@ -292,18 +333,22 @@ class controller:
         root =Tk()
 
         w1 = root
+        w1.title("Model_selector")
         self._model_chooser = model_select(self, all_models, self.current_model,w1)
         self._model_chooser.pack(side="top", fill="both", expand=True)
 
-        w2 = Toplevel(root)
+        w2 = Toplevel(root,name='f')
+        w2.title("Img_selector")
         self._img_selector = img_select(self, self.current_model, w2)
         self._img_selector.pack(side="top", fill="both", expand=True)
 
         w3 = Toplevel(root)
+        w3.title("Index_selector")
         self._index_selector = index_select(self, self.current_model,w3)
         self._index_selector.pack(side="top", fill="both", expand=True)
 
         w4 = Toplevel(root)
+        w4.title("Mask_selector")
         self._mask_dataset = mask_select(self, self.current_model,w4)
         self._mask_dataset.pack(side="top", fill="both", expand=True)
 
