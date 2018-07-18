@@ -337,7 +337,7 @@ class controller:
         self._model_chooser = model_select(self, all_models, self.current_model,w1)
         self._model_chooser.pack(side="top", fill="both", expand=True)
 
-        w2 = Toplevel(root,name='f')
+        w2 = Toplevel(root)
         w2.title("Img_selector")
         self._img_selector = img_select(self, self.current_model, w2)
         self._img_selector.pack(side="top", fill="both", expand=True)
