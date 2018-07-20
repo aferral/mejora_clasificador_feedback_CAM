@@ -64,72 +64,10 @@ from tkinter import Tk, Listbox, END, mainloop
 import numpy as np
 from tkinter import LEFT
 
+from classification_models.classification_model import Abstract_model
+from datasets.dataset import Dataset
+from select_tool.img_selector import img_selector
 
-class selected_model_obj:
-    def __init__(self):
-        all_indexs = ['index0', 'index1', 'index2']
-        all_mask_files = ['mask_f0', 'mask_f1',
-                          'mask_f2']  # TODO ASOCIAR A MODELOS
-        assert (len(all_indexs) > 0)
-        assert (len(all_mask_files) > 0)
-
-        self.dataset_model_tuple = None
-        self.dataset_obj = None
-
-        self.current_index = all_indexs[0]
-        self.index_list = all_indexs
-        self.current_mask_file = None
-        self.current_mask_list = []
-        self.mask_file_list = ['mascaras_f1','mascaras_f2','mascaras_f3']
-
-    def get_current_index(self):
-        return self.current_index
-
-    def set_current_index(self, index):
-        # check if index existe in index_list
-        assert(index in self.index_list)
-        self.current_index = index
-
-    def get_index_list(self):
-        return self.index_list
-
-    def get_mask_list(self):
-        return self.current_mask_list
-
-    def get_current_mask_file(self):
-        return self.current_mask_file
-
-    def set_mask_file(self, mask_file):
-        # check if mask_file in list
-        assert(mask_file in self.mask_file_list)
-        self.current_mask_file = mask_file
-
-    def get_mask_file_list(self):
-        return self.mask_file_list
-
-    def add_mask_file(self, name):
-
-        self.mask_file_list.append(name)
-        # todo crear achivo a disco
-
-
-    def get_img_index(self, index):
-        # check if index existe in index_list
-        assert(index in self.index_list)
-        return np.random.rand(10,0)
-        return self.dataset_obj.get_index(index)
-
-    def get_img_cam(self, index):
-        # todo
-        return None
-
-    def get_mask(self, index):
-        # todo asegurate de crearla en caso de que no exista.
-        return None
-
-    def set_mask(self, index, mask):
-        # todo asegurate de crearla en caso de que no exista.
-        return None
 
 
 
@@ -236,46 +174,6 @@ class params_select:
 
 
 
-class img_select(Frame):
-    def __init__(self,controller,current_model,master,*args,**kwargs):
-        self.controller = controller
-        self.update_model(current_model)
-
-        # Dibujar widget
-        super().__init__(master, *args, **kwargs)
-
-        Label(self, text="Img").grid(row=0, column=0)
-        Label(self, text="CAM").grid(row=0, column=1)
-        Label(self, text="Mask").grid(row=0, column=2)
-
-        Entry(self).grid(row=1, column=0)
-        Entry(self).grid(row=1, column=1)
-        Entry(self).grid(row=1, column=2)
-
-        Button(self, text="Delete mask").grid(row=2, column=0)
-        Button(self, text="Save mask").grid(row=2, column=1)
-
-
-
-    def update_model(self,current_model):
-        self.model = current_model
-        self.current_index = self.model.get_current_index()
-        img=self.model.get_img_index(self.current_index)
-        img_cam = self.model.get_img_cam(self.current_index)
-        mask = self.model.get_mask(self.current_index)
-
-
-
-
-    def commit_mask_changes(self):
-
-        #tomar mascara nueva
-        updated_mask = None
-
-        # editar archivo de mascaras
-        self.controller.event_draw_mask(updated_mask)
-
-
 class model_select(Frame):
     def __init__(self,controller,model_list,current_model,master,*args,**kwargs):
         self.controller = controller
@@ -339,7 +237,7 @@ class controller:
 
         w2 = Toplevel(root)
         w2.title("Img_selector")
-        self._img_selector = img_select(self, self.current_model, w2)
+        self._img_selector = img_selector(self, self.current_model, w2)
         self._img_selector.pack(side="top", fill="both", expand=True)
 
         w3 = Toplevel(root)
