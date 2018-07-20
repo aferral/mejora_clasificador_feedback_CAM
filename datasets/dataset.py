@@ -59,6 +59,15 @@ class Dataset:
         raise NotImplementedError()
 
     @abstractmethod
+    def get_index_list(self):
+        """
+        This function return an image in the trainset. Without the preprocessing step
+        :param index:
+        :return:
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
     def get_train_image_at(self,index):
         """
         This function return an image in the trainset. Without the preprocessing step

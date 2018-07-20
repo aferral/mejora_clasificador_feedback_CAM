@@ -36,6 +36,7 @@ def list_records():
 class CWR_Dataset(Dataset):
 
 
+
     def __init__(self,epochs,batch_size,**kwargs):
 
         tfrecords = list_records()
@@ -122,6 +123,10 @@ class CWR_Dataset(Dataset):
     @property
     def shape_target(self):
         return [4]
+
+    def get_index_list(self):
+        return ['a','b']
+
 
     def get_train_image_at(self, index):
         sess = tf.get_default_session()
