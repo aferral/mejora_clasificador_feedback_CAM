@@ -53,7 +53,6 @@ TODO:
 
 
 """
-
 # todo rename de mask files
 # todo revisar tipos de objetos
 # todo dummizar modelo da datos
@@ -264,6 +263,7 @@ class controller:
     def event_draw_mask(self, mask):
         index = self.current_model.get_current_index()
         self.current_model.set_mask(index,mask)
+        self._index_selector.update_model(self.current_model)
 
 
     def event_change_index(self, selected_index):

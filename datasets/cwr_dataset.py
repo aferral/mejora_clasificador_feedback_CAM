@@ -131,7 +131,7 @@ class CWR_Dataset(Dataset):
     def get_train_image_at(self, index):
         sess = tf.get_default_session()
         temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
-        batch_x, batch_y = sess.run(temp_iterator)
+        index,batch_x, batch_y = sess.run(temp_iterator)
         return self.inverse_preprocess(batch_x)
 
     def get_data_range(self):

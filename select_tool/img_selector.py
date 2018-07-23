@@ -64,18 +64,28 @@ class img_selector(Frame):
             self.current_mask[square[2]:square[3], square[0]:square[1]] = True
 
             # Dibujar en blanco areas en imagen
-            np_org = np.array(self.cam_or)[:,:,0:3]
-            np_org[self.current_mask] = [0, 0, 255]
-            pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+            if self.rgb:
+                np_org = np.array(self.cam_or)[:,:,0:3]
+                np_org[self.current_mask] = [0, 0, 255]
+                pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+            else:
+                np_org = np.array(self.cam_or)[:,:]
+                np_org[self.current_mask] = 255
+                pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'L')
 
             self.img_cam=ImageTk.PhotoImage(image=pil_img)
             self.canvas_cam.itemconfig(self.canvas_img,image=self.img_cam)
 
 
             # Dibujar areas cortadas en select
-            np_org = np.array(self.cam_or)[:,:,0:3]
-            np_org[np.bitwise_not(self.current_mask)] = 0
-            pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+            if self.rgb:
+                np_org = np.array(self.cam_or)[:,:,0:3]
+                np_org[np.bitwise_not(self.current_mask)] = 0
+                pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+            else:
+                np_org = np.array(self.cam_or)[:,:]
+                np_org[np.bitwise_not(self.current_mask)] = 0
+                pil_img = PIL.Image.fromarray(np_org.astype('uint8'), 'L')
             img2 = ImageTk.PhotoImage(image=pil_img)
             self.selection.configure(image=img2)
             self.selection.image = img2
@@ -95,23 +105,31 @@ class img_selector(Frame):
     def update_model(self,current_model):
         self.model = current_model
 
-        # todo GRAYSCALE support??
         self.current_index = self.model.get_current_index()
-        img = self.model.get_img_index(self.current_index)
-        img_cam = self.model.get_img_cam(self.current_index)
+        img,img_cam = self.model.get_img_cam_index(self.current_index)
         mask = self.model.get_mask(self.current_index)
 
         self.current_mask = mask
 
-        self.img_pil = PIL.Image.fromarray(img.astype('uint8'), 'RGB')
-        self.cam_or = PIL.Image.fromarray(img_cam.astype('uint8'), 'RGB')
+        if (len(img.shape) == 3 and img.shape[2] == 3):
+            self.rgb = True
+            self.img_pil = PIL.Image.fromarray(img.astype('uint8'), 'RGB')
+            self.cam_or = PIL.Image.fromarray(img_cam.astype('uint8'), 'RGB')
+            np_org = np.array(self.cam_or)[:, :, 0:3]
+            np_org[np.bitwise_not(self.current_mask)] = 0
+            select_pil = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+        else: #GRAYSCALE
+            self.rgb = False
+            self.img_pil = PIL.Image.fromarray(img.astype('uint8'), 'L')
+            self.cam_or = PIL.Image.fromarray(img_cam.astype('uint8'), 'L')
+            np_org = np.array(self.cam_or)[:, :]
+            np_org[np.bitwise_not(self.current_mask)] = 0
+            select_pil = PIL.Image.fromarray(np_org.astype('uint8'), 'L')
 
-        np_org = np.array(self.cam_or)[:, :, 0:3]
-        np_org[np.bitwise_not(self.current_mask)] = 0
-        select_pil = PIL.Image.fromarray(np_org.astype('uint8'), 'RGB')
+
 
         self.img_or = PIL.ImageTk.PhotoImage(image=self.img_pil)
-        self.img_cam = PIL.ImageTk.PhotoImage(image=self.cam_or) # todo
+        self.img_cam = PIL.ImageTk.PhotoImage(image=self.cam_or)
         self.img_select = ImageTk.PhotoImage(image=select_pil)
 
         # configurar elementos en GUI
