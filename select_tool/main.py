@@ -54,7 +54,7 @@ TODO:
 
 """
 
-
+# todo rename de mask files
 # todo revisar tipos de objetos
 # todo dummizar modelo da datos
 # todo arreglar select a objeto de imagen
@@ -67,13 +67,11 @@ from tkinter import LEFT
 from classification_models.classification_model import Abstract_model
 from datasets.dataset import Dataset
 from select_tool.img_selector import img_selector
-
-
-
+from select_tool.m_file_parser import model_manager_obj
 
 
 class mask_select(Frame):
-    def __init__(self,controller,current_model : selected_model_obj,master,*args,**kwargs):
+    def __init__(self, controller, current_model : model_manager_obj, master, *args, **kwargs):
         self.controller = controller
 
 
@@ -153,7 +151,7 @@ class index_select(Frame):
         self.model = current_model
         self.index_list = self.model.get_index_list()
         self.current_index = self.model.get_current_index()
-        self.mask_list = self.model.get_mask_list()
+        self.mask_list = self.model.get_current_mask_index_list()
 
 
         self.listbox.delete(0, END)
@@ -207,7 +205,7 @@ class model_select(Frame):
 # lista_modelos, lista indices**, lista_mascaras, modelo_activo, indice_activo,mascara_file_selected
 
 class controller:
-    def __init__(self):
+    def __init__(self,model_obj):
 
         # todo logica de objeto o usar strings dict o que cosa_????
         all_models=['cifar10-vgg','imagenet-vgg']
@@ -218,7 +216,7 @@ class controller:
 
 
         # variables of the controller
-        self.current_model = selected_model_obj() #todo temp
+        self.current_model = model_obj
         self.model_list = all_models
 
 
@@ -290,7 +288,9 @@ class controller:
 # Load tuples (dataset, model) in config file
 
 # Obtener indices desde
-central = controller()
+
+with model_manager_obj('model_files/config_files/a.json') as model_manager:
+    central = controller(model_manager)
 
 
 
