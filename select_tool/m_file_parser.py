@@ -7,7 +7,7 @@ from datasets.dataset import Dataset
 from select_tool import ROOT_DIR
 import numpy as np
 import datetime
-
+import cv2
 import pickle
 
 
@@ -154,6 +154,8 @@ class model_manager_obj:
         self.load_from_file(path)
         self.classifier.__enter__()
 
+    def get_n_classes(self):
+        return self.dataset_obj.shape_target[0]
 
     def get_current_index(self):
         return self.current_index
@@ -200,7 +202,13 @@ class model_manager_obj:
 
         img_cam = imshow_util(image_processed.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
 
-        return (img * 255).astype(np.uint8),(img_cam*255).astype(np.uint8)
+        all_cams =[]
+        for i in range(cmaps.shape[0]):
+            im = (cmaps[i]*255).astype(np.uint8)
+            t=cv2.resize(im, (img.shape[0], img.shape[1]))
+            all_cams.append(t)
+
+        return (img * 255).astype(np.uint8),all_cams,prediction
 
     def update_mask_file(self):
         print("Updating mask file {0}".format(self.current_mask_file))

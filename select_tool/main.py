@@ -46,17 +46,15 @@ Creo que todos los dataset deberia tenre
 
 
 TODO:
-- MANEJAR FACTOR de resize de imagen en interfaz
 - Manejar movimiento entre imagen con teclas??
 
 
 
 
 """
+# todo select de cam hacer que fncion --- asociar mascara a indice,c_index
 # todo rename de mask files
 # todo revisar tipos de objetos
-# todo dummizar modelo da datos
-# todo arreglar select a objeto de imagen
 # todo requiero limpiar un modelo no en uso ????
 from tkinter import Widget, Frame, Toplevel, Label, Entry, Button
 from tkinter import Tk, Listbox, END, mainloop
