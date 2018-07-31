@@ -45,26 +45,23 @@ Creo que todos los dataset deberia tenre
     -- Get index especifico
 
 
-TODO:
-- Manejar movimiento entre imagen con teclas??
-
-
 
 
 """
 # todo select de cam hacer que fncion --- asociar mascara a indice,c_index
+# todo agregar informacion extra en interfaz indexs
 # todo rename de mask files
 # todo revisar tipos de objetos
 # todo requiero limpiar un modelo no en uso ????
 from tkinter import Widget, Frame, Toplevel, Label, Entry, Button
 from tkinter import Tk, Listbox, END, mainloop
 import numpy as np
-from tkinter import LEFT
+from tkinter import LEFT,StringVar
 
 from classification_models.classification_model import Abstract_model
 from datasets.dataset import Dataset
 from select_tool.img_selector import img_selector
-from select_tool.m_file_parser import model_manager_obj
+from select_tool.m_file_parser import model_manager_obj, get_config_file_list
 
 
 class mask_select(Frame):
@@ -74,14 +71,14 @@ class mask_select(Frame):
 
         super().__init__(master, *args, **kwargs)
         self.listbox = Listbox(self, exportselection=False)
-        self.listbox.pack()
+        self.listbox.pack(fill="both", expand=True)
+        self.listbox.bind("<<ListboxSelect>>",self.selection)
         Label(self,text="New mask file: ").pack()
-        Entry(self).pack()
-        Button(self,text='Create').pack()
+        self.entry_text = StringVar()
+        Entry(self,textvariable=self.entry_text).pack()
+        Button(self,text='Create',command=self.add_new).pack()
 
         self.update_model(current_model)
-
-
 
 
     def update_model(self, current_model):
@@ -95,20 +92,23 @@ class mask_select(Frame):
         self.listbox.select_set(0)
         self.listbox.event_generate("<<ListboxSelect>>")
 
-    def selection(self):
-        selected = None
+    def selection(self,event):
+        w = event.widget
+        index = int(w.curselection()[0])
+        value = w.get(index)
+        selected = value
         self.controller.event_change_mask_file(selected)
         pass
 
     def add_new(self):
-        new = None
+        new = self.entry_text.get()
         self.controller.event_add_mask_file(new)
         pass
 
 class index_select(Frame):
     def __init__(self,controller,current_model,master,*args,**kwargs):
         self.controller = controller
-
+        self.current_model = current_model
 
 
         #dibujar widget
@@ -141,7 +141,7 @@ class index_select(Frame):
         self.update_model(current_model)
         self.listbox.select_set(0)
         self.listbox.event_generate("<<ListboxSelect>>")
-
+        self.listbox.bind('<<ListboxSelect>>', self.selection)
 
 
     def update_model(self, current_model):
@@ -156,8 +156,11 @@ class index_select(Frame):
             self.listbox.insert(END, item)
 
 
-    def selection(self):
-        selected_index = None
+    def selection(self,event):
+        w = event.widget
+        index = int(w.curselection()[0])
+        value = w.get(index)
+        selected_index = value
         self.controller.event_change_index(selected_index)
         pass
 
@@ -189,31 +192,29 @@ class model_select(Frame):
         self.listbox.event_generate("<<ListboxSelect>>")
 
     def selection(self,x):
-        print(x)
-        selected = None
+        w = x.widget
+        index = int(w.curselection()[0])
+        value = w.get(index)
+        print(value)
 
         # Send message to interface to load another model
-        # self.controller.event_change_model(selected)
+        self.current_model.load_from_file(value)
         pass
 
 
 
-# Estado del controlador
-# lista_modelos, lista indices**, lista_mascaras, modelo_activo, indice_activo,mascara_file_selected
 
 class controller:
-    def __init__(self,model_obj):
+    def __init__(self, default_model_obj,model_file_list):
 
-        # todo logica de objeto o usar strings dict o que cosa_????
-        all_models=['cifar10-vgg','imagenet-vgg']
-
+        all_models=model_file_list
 
 
         assert(len(all_models) > 0)
 
 
         # variables of the controller
-        self.current_model = model_obj
+        self.current_model = default_model_obj
         self.model_list = all_models
 
 
@@ -242,8 +243,8 @@ class controller:
 
         w4 = Toplevel(root)
         w4.title("Mask_selector")
-        self._mask_dataset = mask_select(self, self.current_model,w4)
-        self._mask_dataset.pack(side="top", fill="both", expand=True)
+        self._mask_f_select = mask_select(self, self.current_model, w4)
+        self._mask_f_select.pack(side="top", fill="both", expand=True)
 
         root.mainloop()
 
@@ -256,7 +257,7 @@ class controller:
         # Reload
         self._img_selector.update_model(self.current_model)
         self._index_selector.update_model(self.current_model)
-        self._mask_dataset.update_model(self.current_model)
+        self._mask_f_select.update_model(self.current_model)
 
     def event_draw_mask(self, mask):
         index = self.current_model.get_current_index()
@@ -278,6 +279,7 @@ class controller:
 
     def event_add_mask_file(self, new_mask_file):
         self.current_model.add_mask_file(new_mask_file)
+        self._mask_f_select.update_model(self.current_model)
 
 
     def event_params_change(self, selected_model):
@@ -286,9 +288,9 @@ class controller:
 # Load tuples (dataset, model) in config file
 
 # Obtener indices desde
-
+config_list = get_config_file_list()
 with model_manager_obj('model_files/config_files/a.json') as model_manager:
-    central = controller(model_manager)
+    central = controller(model_manager,config_list)
 
 
 

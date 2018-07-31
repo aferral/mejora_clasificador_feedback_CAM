@@ -56,7 +56,7 @@ def create_empty_mask_file(mask_folder,dataset_key,classifier_key,name=None):
     with open(out_path,'wb') as f:
         pickle.dump(empty_mask_object,f)
 
-    return out_path
+    return os.path.relpath(out_path, start=ROOT_DIR)
 
 def get_config_file_list():
     files = os.listdir(config_folder)

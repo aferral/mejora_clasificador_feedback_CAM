@@ -1,8 +1,15 @@
+import cv2
 import tensorflow as tf
 import os
+
+from skimage import io
+
 from datasets.dataset import Dataset
 from tf_records_parser.cifar10 import LOCAL_FOLDER
 import numpy as np
+
+from tf_records_parser.cwr_parser import grayscaleEq
+
 
 def parse_function(example_proto):
     features = {"image_raw": tf.FixedLenFeature((), tf.string),
@@ -37,7 +44,10 @@ class CWR_Dataset(Dataset):
 
 
 
-    def __init__(self,epochs,batch_size,**kwargs):
+    def __init__(self,epochs,batch_size,data_folder=None,**kwargs):
+
+        if data_folder:
+            self.data_folder = data_folder
 
         tfrecords = list_records()
 
@@ -125,14 +135,15 @@ class CWR_Dataset(Dataset):
         return [4]
 
     def get_index_list(self):
-        return ['a','b']
+        assert(hasattr(self,'data_folder')), "Carpeta de imagenes no definida"
+        files=os.listdir(self.data_folder)
+        return files
 
 
     def get_train_image_at(self, index):
-        sess = tf.get_default_session()
-        temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
-        index,batch_x, batch_y = sess.run(temp_iterator)
-        return self.inverse_preprocess(batch_x)
+        assert (hasattr(self, 'data_folder')), "Carpeta de imagenes no definida"
+        img  = grayscaleEq(io.imread(os.path.join(self.data_folder, index)))
+        return img.reshape(1,96,96,1)
 
     def get_data_range(self):
         return [0,255]

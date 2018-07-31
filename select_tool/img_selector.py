@@ -135,11 +135,13 @@ class img_selector(Frame):
         # configure options select
         self.list_cam['menu'].delete(0, 'end')
 
-        # Insert list of new options (tk._setit hooks them up to var)
+
         labels = ["class: {0} score: {1}".format(i,scores[i]) for i in range(self.n_clases)]
         self.cam_selected.set(labels[0])
         for i in range(self.n_clases):
             self.list_cam['menu'].add_command(label=labels[i], command=tkinter._setit(self.cam_selected, labels[i]))
+
+
         img_cam = all_cams[0]
         self.current_mask = mask
 
