@@ -48,20 +48,20 @@ Creo que todos los dataset deberia tenre
 
 
 """
-# todo select de cam hacer que fncion --- asociar mascara a indice,c_index
 # todo agregar informacion extra en interfaz indexs
 # todo rename de mask files
+# todo anotar descripcion en mask file??
 # todo revisar tipos de objetos
 # todo requiero limpiar un modelo no en uso ????
 from tkinter import Widget, Frame, Toplevel, Label, Entry, Button
 from tkinter import Tk, Listbox, END, mainloop
 import numpy as np
 from tkinter import LEFT,StringVar
-
+import os
 from classification_models.classification_model import Abstract_model
 from datasets.dataset import Dataset
 from select_tool.img_selector import img_selector
-from select_tool.m_file_parser import model_manager_obj, get_config_file_list
+from select_tool.m_file_parser import model_manager_obj, get_config_file_list, config_folder
 
 
 class mask_select(Frame):
@@ -212,7 +212,9 @@ class model_select(Frame):
         print(value)
 
         # Send message to interface to load another model
-        self.current_model.load_from_file(value)
+        f_path = os.path.join(config_folder, value)
+        self.current_model.change_model(f_path)
+        self.controller.event_change_model(self.current_model)
         pass
 
 
@@ -301,9 +303,10 @@ class controller:
 
 # Load tuples (dataset, model) in config file
 
-# Obtener indices desde
 config_list = get_config_file_list()
-with model_manager_obj('model_files/config_files/a.json') as model_manager:
+f_path = os.path.join(config_folder,config_list[0])
+
+with model_manager_obj(f_path) as model_manager:
     central = controller(model_manager,config_list)
 
 

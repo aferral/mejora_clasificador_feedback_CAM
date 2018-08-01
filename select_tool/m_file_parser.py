@@ -2,8 +2,11 @@ import os
 import json
 from classification_models.classification_model import CWR_classifier, \
     Abstract_model, imshow_util
+from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
+from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset
 from datasets.dataset import Dataset
+from datasets.imagenet_data import Imagenet_Dataset
 from select_tool import ROOT_DIR
 import numpy as np
 import datetime
@@ -21,11 +24,14 @@ os.makedirs(masks_folder,exist_ok=True)
 
 dataset_obj_dict = {
     'CWR' : CWR_Dataset,
+    'Imagenet_subset' : Imagenet_Dataset,
+    'cifar10' : Cifar10_Dataset
 
 }
 
 model_obj_dict = {
     'CWR_classifier': CWR_classifier,
+    "vgg_16_batchnorm" : vgg_16_batchnorm
 }
 
 default_keys = ['dataset_key','model_key','mask_files','dataset_params','model_params','model_load_path']
@@ -148,7 +154,7 @@ class model_manager_obj:
 
     def change_model(self,path):
 
-        self.classifier.close() # classifier is an exit stack so close handle session close
+        self.classifier.close() # classifier is an exit stack so it can handle session close
 
         # open new classifier
         self.load_from_file(path)
@@ -194,8 +200,9 @@ class model_manager_obj:
         print("Getting {0}".format(index))
         assert (index in self.index_list)
 
-        batch_x = self.dataset_obj.get_train_image_at(index)
+        batch_x, labels = self.dataset_obj.get_train_image_at(index)
         test_image = batch_x[0]
+        r_label = labels[0]
         img = imshow_util(test_image.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
 
         image_processed, prediction, cmaps = self.classifier.visualize(test_image)
@@ -208,7 +215,7 @@ class model_manager_obj:
             t=cv2.resize(im, (img.shape[0], img.shape[1]))
             all_cams.append(t)
 
-        return (img * 255).astype(np.uint8),all_cams,prediction
+        return (img * 255).astype(np.uint8),all_cams,prediction,r_label
 
     def update_mask_file(self):
         print("Updating mask file {0}".format(self.current_mask_file))
@@ -218,18 +225,19 @@ class model_manager_obj:
             pickle.dump(t,f)
 
     def get_mask(self, index):
+        shape_2d = self.dataset_obj.vis_shape()[0:2]
 
         if index in self.current_mask_index_map:
-            return self.current_mask_index_map[index].reshape(self.dataset_obj.vis_shape()).copy()
+            return self.current_mask_index_map[index].reshape(shape_2d).copy()
         else:
             print("Creating mask for index {0}".format(index))
 
-            new_mask = np.zeros(self.dataset_obj.shape).astype(np.bool)
+            new_mask = np.zeros(shape_2d).astype(np.bool)
             self.current_mask_index_map[index] = new_mask
             # update file
             self.update_mask_file()
 
-        return self.current_mask_index_map[index].reshape(self.dataset_obj.vis_shape()).copy()
+        return self.current_mask_index_map[index].reshape(shape_2d).copy()
 
     def set_mask(self, index, mask):
         self.current_mask_index_map[index] = mask

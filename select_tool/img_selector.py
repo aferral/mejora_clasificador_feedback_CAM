@@ -7,6 +7,8 @@ import numpy as np
 import cv2
 
 
+selection_rgb_color = [0,255,0]
+
 def resize(img,factor):
     img=img.copy().astype('uint8')
     if factor != 1:
@@ -22,18 +24,18 @@ class img_selector(Frame):
     def draw_square(self,square):
         square = list(map(lambda x: int(x / self.factor), list(square)))
 
-        # Crezco la mascara
+        # Add square to mask
         self.current_mask[square[2]:square[3], square[0]:square[1]] = True
 
-        # Dibujar en blanco areas en imagen
+        # Draw selected area for visualization image
+        np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
+        np_org[self.current_mask] = selection_rgb_color
+        pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
+        self.img_cam = ImageTk.PhotoImage(image=pil_img)
+        self.canvas_cam.itemconfig(self.canvas_img, image=self.img_cam)
+
         if self.rgb:
-            np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
-            np_org[self.current_mask] = [0, 0, 255]
-            pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
-
-            self.img_cam = ImageTk.PhotoImage(image=pil_img)
-            self.canvas_cam.itemconfig(self.canvas_img, image=self.img_cam)
-
+            # Draw selected pixels in selection canvas
             np_org = np.array(self.unresized_image_for_select)[:, :, 0:3]
             np_org[np.bitwise_not(self.current_mask)] = 0
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
@@ -43,19 +45,14 @@ class img_selector(Frame):
 
 
         else:
-            np_org = np.array(self.unresized_vis_for_select)[:, :]
-            np_org[self.current_mask] = 255
-            pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
-
-            self.img_cam = ImageTk.PhotoImage(image=pil_img)
-            self.canvas_cam.itemconfig(self.canvas_img, image=self.img_cam)
-
+            # Draw selected pixels in selection canvas
             np_org = np.array(self.unresized_image_for_select)[:, :]
             np_org[np.bitwise_not(self.current_mask)] = 0
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
             img2 = ImageTk.PhotoImage(image=pil_img)
             self.selection.configure(image=img2)
             self.selection.image = img2
+
 
     def __init__(self,controller,current_model,master,*args,**kwargs):
 
@@ -77,7 +74,8 @@ class img_selector(Frame):
         # Label for original image
         w0 = tkinter.Toplevel(self)
         w0.title('Img_org')
-        tkinter.Label(w0, text="Img_org").pack()
+        self.title_img_or = tkinter.StringVar(w0)
+        tkinter.Label(w0, textvariable=self.title_img_or).pack()
         self.label_img_or = tkinter.Label(w0, image=self.img_or)
         self.label_img_or.pack()
 
@@ -140,16 +138,18 @@ class img_selector(Frame):
         return temp
 
     def update_images(self,img,img_cam):
+
+        # configure visualization image
+        self.unresized_vis_for_select = PIL.Image.fromarray(resize(img_cam, 1), 'RGB')  # dont scale this
+        # configure cam image
+        np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
+        np_org[self.current_mask] = selection_rgb_color
+        self.cam_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
+
         if (len(img.shape) == 3 and img.shape[2] == 3):
             self.rgb = True
             self.img_pil = PIL.Image.fromarray(resize(img,self.factor), 'RGB')
             self.unresized_image_for_select = PIL.Image.fromarray(resize(img, 1), 'RGB')  # dont scale this
-            self.unresized_vis_for_select = PIL.Image.fromarray(resize(img_cam, 1), 'RGB')  # dont scale this
-
-            # configure cam image
-            np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
-            np_org[self.current_mask] = [0, 0, 255]
-            self.cam_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
 
             # configure select image
             np_org = np.array(self.unresized_image_for_select)[:, :, 0:3]
@@ -157,24 +157,15 @@ class img_selector(Frame):
             select_pil = PIL.Image.fromarray(resize(np_org,self.factor), 'RGB')
 
 
-
         else: #GRAYSCALE
             self.rgb = False
             self.img_pil = PIL.Image.fromarray(resize(img,self.factor), 'L')
             self.unresized_image_for_select = PIL.Image.fromarray(resize(img, 1), 'L') # dont scale this
-            self.unresized_vis_for_select = PIL.Image.fromarray(resize(img_cam, 1), 'L')  # dont scale this
-
-            # configure cam image
-            np_org = np.array(self.unresized_vis_for_select)[:, :]
-            np_org[self.current_mask] = 255
-            self.cam_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
 
             # configure select image
             np_org = np.array(self.unresized_image_for_select)[:, :]
             np_org[np.bitwise_not(self.current_mask)] = 0
             select_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
-
-
 
         self.img_or = PIL.ImageTk.PhotoImage(image=self.img_pil)
         self.img_cam = PIL.ImageTk.PhotoImage(image=self.cam_pil)
@@ -193,12 +184,15 @@ class img_selector(Frame):
         self.n_clases = self.model.get_n_classes()
 
         self.current_index = self.model.get_current_index()
-        img,all_cams,scores = self.model.get_img_cam_index(self.current_index)
+        img,all_cams,scores,r_label = self.model.get_img_cam_index(self.current_index)
+
+        # add real label
+        self.title_img_or.set("Img org. Real label {0}".format(r_label))
 
         # Save reference to all visualizations
         self.current_img = img
-        # aplica colormaps a cams todo cv2.applyColorMap(img, cv2.COLORMAP_JET)
-        self.visualizations = {i : all_cams[i] for i in range(len(all_cams))}
+        # aplica colormaps a cams
+        self.visualizations = {i : cv2.applyColorMap(all_cams[i], cv2.COLORMAP_JET) for i in range(len(all_cams))}
 
 
 
@@ -218,7 +212,7 @@ class img_selector(Frame):
 
 
     def reset_mask(self):
-        img_cam = np.array(self.unresized_vis_for_select)
+        img_cam = np.array(self.unresized_image_for_select)
         self.current_mask = np.zeros((img_cam.shape[0],img_cam.shape[1])).astype(np.bool)
         self.draw_square((0,0,0,0))
 

@@ -135,15 +135,16 @@ class CWR_Dataset(Dataset):
         return [4]
 
     def get_index_list(self):
-        assert(hasattr(self,'data_folder')), "Carpeta de imagenes no definida"
+        assert(hasattr(self,'data_folder')), "Image folder undefined"
         files=os.listdir(self.data_folder)
         return files
 
 
     def get_train_image_at(self, index):
-        assert (hasattr(self, 'data_folder')), "Carpeta de imagenes no definida"
+        assert (hasattr(self, 'data_folder')), "Image folder undefined"
         img  = grayscaleEq(io.imread(os.path.join(self.data_folder, index)))
-        return img.reshape(1,96,96,1)
+        label = index.split("_")[-1][0] # label given by image_label.jpg
+        return img.reshape(1,96,96,1), label
 
     def get_data_range(self):
         return [0,255]

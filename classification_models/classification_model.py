@@ -39,6 +39,8 @@ class Abstract_model(ExitStack):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sess.close()
+        # DELETE GRAPH
+        tf.reset_default_graph()
         super().__exit__(exc_type, exc_val, exc_tb)
 
     def define_arch_base(self):

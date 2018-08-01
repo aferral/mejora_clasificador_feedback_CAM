@@ -1,3 +1,4 @@
+import cv2
 import tensorflow as tf
 import os
 from datasets.dataset import Dataset
@@ -40,9 +41,13 @@ def list_records():
 
 class Imagenet_Dataset(Dataset):
 
-    def __init__(self,epochs,batch_size,**kwargs):
+
+    def __init__(self,epochs,batch_size,data_folder=None,**kwargs):
         tfrecords = list_records()
         n_records = len(tfrecords)
+
+        if data_folder:
+            self.data_folder = data_folder
 
         train_n_records = int(0.8*n_records)
         val_n_records = int(0.1*n_records)
@@ -124,11 +129,29 @@ class Imagenet_Dataset(Dataset):
     def shape_target(self):
         return [21]
 
-    def get_train_image_at(self, index):
-        sess = tf.get_default_session()
-        temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
-        batch_x, batch_y = sess.run(temp_iterator)
-        return self.inverse_preprocess(batch_x )
+
+    def get_index_list(self):
+        assert(hasattr(self,'data_folder')), "Image folder undefined"
+        l=[]
+        for folder in os.listdir(self.data_folder):
+            if os.path.isdir(os.path.join(self.data_folder,folder)):
+                for f_p in os.listdir(os.path.join(self.data_folder,folder)):
+                    ext = f_p.split('.')[-1].lower()
+                    if (ext == 'jpg') or (ext == 'jpeg'):
+                        l.append(f_p)
+        return l
+
+
+    def get_train_image_at(self, index): # index is image path
+        # example: n02423022_7746.JPEG
+        # n02423022_original_images
+        assert (hasattr(self, 'data_folder')), "Image folder undefined"
+        class_name = index.split('_')[0]
+        full_path = os.path.join(self.data_folder,"{0}_original_images".format(class_name),index)
+        img  = cv2.imread(full_path)
+        s=self.vis_shape()
+        img_out = cv2.resize(img,tuple(s[0:2])) # original image need resize
+        return img_out.reshape(1,s[0],s[1],s[2]), class_name
 
     def get_data_range(self):
         return [0,255]

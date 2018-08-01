@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 from datasets.dataset import Dataset
-from tf_records_parser.cifar10 import LOCAL_FOLDER
+from tf_records_parser.cifar10 import LOCAL_FOLDER, read_pickle_from_file
 import numpy as np
 
 def parse_function(example_proto):
@@ -24,7 +24,11 @@ def parse_function(example_proto):
 class Cifar10_Dataset(Dataset):
 
 
-    def __init__(self,epochs,batch_size,**kwargs):
+    def __init__(self,epochs,batch_size,data_folder=None,**kwargs):
+
+
+        if data_folder:
+            self.data_folder = data_folder
 
         train_records = os.path.join(LOCAL_FOLDER,'train.tfrecords')
         validation_records = os.path.join(LOCAL_FOLDER, 'validation.tfrecords')
@@ -96,11 +100,39 @@ class Cifar10_Dataset(Dataset):
     def shape_target(self):
         return [10]
 
+    def get_index_list(self):
+        assert(hasattr(self,'data_folder')), "Image folder undefined"
+
+        data_f = ['data_batch_{0}'.format(i) for i in range(1,6)]
+        data_f += ['test_batch']
+
+        indexs = []
+        for f in data_f:
+            for j in range(10000):
+                indexs.append('{0} -- {1}'.format(f,j))
+
+        return indexs
+
+
     def get_train_image_at(self, index):
-        sess = tf.get_default_session()
-        temp_iterator = self.train_dataset.make_one_shot_iterator().get_next()
-        batch_x, batch_y = sess.run(temp_iterator)
-        return self.inverse_preprocess(batch_x)
+        # example: data_batch_1 -- 0
+        assert (hasattr(self, 'data_folder')), "Image folder undefined"
+
+        if type(index) == str:
+            file,row=index.split('--')
+        else:
+            file,row=index.decode('utf-8').split('--')
+        file=file.strip()
+        row=int(row.strip())
+
+        full_path = os.path.join(self.data_folder, file)
+        data=read_pickle_from_file(full_path)
+        img=data['data'][row]
+        label=data['labels'][row]
+        s=self.vis_shape()
+        img_out = np.swapaxes(img.reshape(3,32,32),0,2)
+        return img_out.reshape(1,s[0],s[1],s[2]), [label]
+
 
     def get_data_range(self):
         return [0,255]

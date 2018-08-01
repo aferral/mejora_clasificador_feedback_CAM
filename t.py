@@ -123,11 +123,11 @@ if __name__ == '__main__':
         else:
             # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
             #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
-            model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
+            model.load('./model/vgg16_classifier/29_May_2018__01_41')
             # model.eval()
 
 
-            test_image = dataset.get_train_image_at(0)[0]
+            test_image,labels = dataset.get_train_image_at(0)[0]
             test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
 
             image_processed, prediction, cmaps = model.visualize(test_image)
