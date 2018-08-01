@@ -14,6 +14,8 @@ def resize(img,factor):
     return img
 
 
+
+
 class img_selector(Frame):
 
 
@@ -25,14 +27,14 @@ class img_selector(Frame):
 
         # Dibujar en blanco areas en imagen
         if self.rgb:
-            np_org = np.array(self.unresized_cam_pil)[:, :, 0:3]
+            np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
             np_org[self.current_mask] = [0, 0, 255]
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
 
             self.img_cam = ImageTk.PhotoImage(image=pil_img)
             self.canvas_cam.itemconfig(self.canvas_img, image=self.img_cam)
 
-            np_org = np.array(self.unresized_cam_pil)[:, :, 0:3]
+            np_org = np.array(self.unresized_image_for_select)[:, :, 0:3]
             np_org[np.bitwise_not(self.current_mask)] = 0
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
             img2 = ImageTk.PhotoImage(image=pil_img)
@@ -41,14 +43,14 @@ class img_selector(Frame):
 
 
         else:
-            np_org = np.array(self.unresized_cam_pil)[:, :]
+            np_org = np.array(self.unresized_vis_for_select)[:, :]
             np_org[self.current_mask] = 255
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
 
             self.img_cam = ImageTk.PhotoImage(image=pil_img)
             self.canvas_cam.itemconfig(self.canvas_img, image=self.img_cam)
 
-            np_org = np.array(self.unresized_cam_pil)[:, :]
+            np_org = np.array(self.unresized_image_for_select)[:, :]
             np_org[np.bitwise_not(self.current_mask)] = 0
             pil_img = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
             img2 = ImageTk.PhotoImage(image=pil_img)
@@ -63,7 +65,7 @@ class img_selector(Frame):
 
         self.size=1
         self.factor = 3
-        self.n_clases = 2
+        self.n_clases = 2 # dummy initial value. Updated when a model is loaded
 
         self.img_or = ImageTk.PhotoImage(image=PIL.Image.fromarray(np.random.rand(100,100,3).astype('uint8'), 'RGB'))
         self.img_cam = ImageTk.PhotoImage(image=PIL.Image.fromarray(np.random.rand(100,100,3).astype('uint8'), 'RGB'))
@@ -79,12 +81,19 @@ class img_selector(Frame):
         self.label_img_or = tkinter.Label(w0, image=self.img_or)
         self.label_img_or.pack()
 
+
+
+        labels_cam = ['class {0} score: {1}' for i in range(self.n_clases)]
+
+
+
         # Canvas for CAM image
         w1 = tkinter.Toplevel(self)
         w1.title('Img_cam')
         tkinter.Label(w1, text="Img_cam").pack()
         self.cam_selected =  tkinter.StringVar(w1)
-        self.list_cam = tkinter.OptionMenu(w1,self.cam_selected, *['class {0} score: {1}' for i in range(self.n_clases)])
+
+        self.list_cam = tkinter.OptionMenu(w1,self.cam_selected, *labels_cam)
         self.list_cam.pack()
         self.canvas_cam = tkinter.Canvas(w1, width=self.img_cam.width(), height=self.img_cam.height())
         tkinter.Button(w1, text="Reset mask (Doesnt commit yet)",command=self.reset_mask).pack()
@@ -122,41 +131,28 @@ class img_selector(Frame):
 
         self.update_model(current_model)
 
+    def change_selected_list(self,var, value, index):
+        def temp(*args):
+            var.set(value)
+            print("CHANGING CAM TO {0} -- {1}".format(value, index))
+            self.update_images(self.current_img,self.visualizations[index])
 
+        return temp
 
-    def update_model(self,current_model):
-        self.model = current_model
-        self.n_clases = self.model.get_n_classes()
-
-        self.current_index = self.model.get_current_index()
-        img,all_cams,scores = self.model.get_img_cam_index(self.current_index)
-        mask = self.model.get_mask(self.current_index)
-
-        # configure options select
-        self.list_cam['menu'].delete(0, 'end')
-
-
-        labels = ["class: {0} score: {1}".format(i,scores[i]) for i in range(self.n_clases)]
-        self.cam_selected.set(labels[0])
-        for i in range(self.n_clases):
-            self.list_cam['menu'].add_command(label=labels[i], command=tkinter._setit(self.cam_selected, labels[i]))
-
-
-        img_cam = all_cams[0]
-        self.current_mask = mask
-
+    def update_images(self,img,img_cam):
         if (len(img.shape) == 3 and img.shape[2] == 3):
             self.rgb = True
             self.img_pil = PIL.Image.fromarray(resize(img,self.factor), 'RGB')
-            self.unresized_cam_pil = PIL.Image.fromarray(resize(img_cam, 1), 'RGB')  # dont scale this
+            self.unresized_image_for_select = PIL.Image.fromarray(resize(img, 1), 'RGB')  # dont scale this
+            self.unresized_vis_for_select = PIL.Image.fromarray(resize(img_cam, 1), 'RGB')  # dont scale this
 
             # configure cam image
-            np_org = np.array(self.unresized_cam_pil)[:, :, 0:3]
+            np_org = np.array(self.unresized_vis_for_select)[:, :, 0:3]
             np_org[self.current_mask] = [0, 0, 255]
             self.cam_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'RGB')
 
             # configure select image
-            np_org = np.array(self.unresized_cam_pil)[:, :, 0:3]
+            np_org = np.array(self.unresized_image_for_select)[:, :, 0:3]
             np_org[np.bitwise_not(self.current_mask)] = 0
             select_pil = PIL.Image.fromarray(resize(np_org,self.factor), 'RGB')
 
@@ -165,15 +161,16 @@ class img_selector(Frame):
         else: #GRAYSCALE
             self.rgb = False
             self.img_pil = PIL.Image.fromarray(resize(img,self.factor), 'L')
-            self.unresized_cam_pil = PIL.Image.fromarray(resize(img_cam, 1), 'L') # dont scale this
+            self.unresized_image_for_select = PIL.Image.fromarray(resize(img, 1), 'L') # dont scale this
+            self.unresized_vis_for_select = PIL.Image.fromarray(resize(img_cam, 1), 'L')  # dont scale this
 
             # configure cam image
-            np_org = np.array(self.unresized_cam_pil)[:, :]
+            np_org = np.array(self.unresized_vis_for_select)[:, :]
             np_org[self.current_mask] = 255
             self.cam_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
 
             # configure select image
-            np_org = np.array(self.unresized_cam_pil)[:, :]
+            np_org = np.array(self.unresized_image_for_select)[:, :]
             np_org[np.bitwise_not(self.current_mask)] = 0
             select_pil = PIL.Image.fromarray(resize(np_org, self.factor), 'L')
 
@@ -191,8 +188,37 @@ class img_selector(Frame):
 
         self.selection.configure(image=self.img_select)
 
+    def update_model(self,current_model):
+        self.model = current_model
+        self.n_clases = self.model.get_n_classes()
+
+        self.current_index = self.model.get_current_index()
+        img,all_cams,scores = self.model.get_img_cam_index(self.current_index)
+
+        # Save reference to all visualizations
+        self.current_img = img
+        # aplica colormaps a cams todo cv2.applyColorMap(img, cv2.COLORMAP_JET)
+        self.visualizations = {i : all_cams[i] for i in range(len(all_cams))}
+
+
+
+        # configure options select
+        self.list_cam['menu'].delete(0, 'end')
+        labels = ["class: {0} score: {1}".format(i,scores[i]) for i in range(self.n_clases)]
+        self.cam_selected.set('')
+        self.list_cam['menu'].delete(0, 'end')
+        for i in range(self.n_clases):
+            self.list_cam['menu'].add_command(label=labels[i], command=self.change_selected_list(self.cam_selected,labels[i],i))
+
+        # Get mask and configure images
+        current_index = 0
+        self.current_mask = self.model.get_mask(self.current_index)
+        self.cam_selected.set(labels[current_index])
+        self.update_images(self.current_img, self.visualizations[current_index])
+
+
     def reset_mask(self):
-        img_cam = np.array(self.unresized_cam_pil)
+        img_cam = np.array(self.unresized_vis_for_select)
         self.current_mask = np.zeros((img_cam.shape[0],img_cam.shape[1])).astype(np.bool)
         self.draw_square((0,0,0,0))
 

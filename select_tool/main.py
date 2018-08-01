@@ -134,8 +134,8 @@ class index_select(Frame):
         f2.pack()
 
         f3=Frame(self)
-        Button(self, text='<<').pack(side=LEFT)
-        Button(self, text='>>').pack(side=LEFT)
+        Button(self, text='<<',command=self.next_prev(-1)).pack(side=LEFT)
+        Button(self, text='>>',command=self.next_prev(1)).pack(side=LEFT)
         f3.pack()
 
         self.update_model(current_model)
@@ -155,12 +155,26 @@ class index_select(Frame):
         for item in self.index_list:
             self.listbox.insert(END, item)
 
+    def next_prev(self,x):
+        def selection():
+            ind_l = self.index_list.index(self.current_index)
+            n = len(self.index_list)
+            n_ind_l = (ind_l+x) % n
+            next = self.index_list[n_ind_l]
+            self.current_index = next
+            self.listbox.selection_clear(0, END)
+            self.listbox.select_set(n_ind_l)
+            self.controller.event_change_index(next)
+
+        return selection
 
     def selection(self,event):
         w = event.widget
         index = int(w.curselection()[0])
         value = w.get(index)
+        print("v: {0}".format(value))
         selected_index = value
+        self.current_index = selected_index
         self.controller.event_change_index(selected_index)
         pass
 
