@@ -214,13 +214,16 @@ def exp_CAM_eval(dataset,classifier,out_folder):
                 break
 
 
-def visualize_dataset_CAM_predicted(dataset,model,out_folder):
+def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_class=None):
 
     dataset.initialize_iterator_val(model.sess)
 
     # make imgs folder
     imgs_f = os.path.join(out_folder,"CAM_imgs")
     os.makedirs(imgs_f,exist_ok=True)
+
+    out_list = []
+    index_list = []
 
     counter=0
     with timeit():
@@ -232,7 +235,7 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
                 tensors=[model.indexs,model.input_l,model.last_conv, model.softmax_weights, model.targets, model.pred]
                 indexs,images,conv_acts,softmax_w,y_real ,y_pred = model.sess.run(tensors, fd)
 
-                pred_class = np.argmax(y_pred,axis=1)
+                pred_class = np.ones((y_pred.shape[0],1)) * x_class if x_class else np.argmax(y_pred,axis=1)
                 pred_values = np.max(y_pred,axis=1)
 
                 batch_s = conv_acts.shape[0]
@@ -260,24 +263,27 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
                     cam_img = imshow_util(cam_maps[ind],[cam_maps[ind].min(),cam_maps[ind].max()])
                     resized_map = resize(cam_img,out_shape,mode='constant')
 
-
-                    # Blend the visualization and the image with cv2
-                    heatmap_jet = cv2.applyColorMap((resized_map*255).astype(np.uint8), cv2.COLORMAP_JET)
-                    if len(test_image_plot.shape) == 2 or test_image_plot.shape[2] == 1:
-                        rgb_grayscale = cv2.cvtColor((test_image_plot*255).astype(np.uint8),cv2.COLOR_GRAY2RGB)
-                        dest = cv2.addWeighted(rgb_grayscale, 0.7, heatmap_jet, 0.3, 0, dtype=3)
+                    if out_pickle:
+                        out_list.append(resized_map.flatten())
+                        index_list.append(indexs[ind])
                     else:
-                        dest = cv2.addWeighted((test_image_plot*255).astype(np.uint8), 0.7, heatmap_jet, 0.3, 0,dtype=3)
+                        # Blend the visualization and the image with cv2
+                        heatmap_jet = cv2.applyColorMap((resized_map*255).astype(np.uint8), cv2.COLORMAP_JET)
+                        if len(test_image_plot.shape) == 2 or test_image_plot.shape[2] == 1:
+                            rgb_grayscale = cv2.cvtColor((test_image_plot*255).astype(np.uint8),cv2.COLOR_GRAY2RGB)
+                            dest = cv2.addWeighted(rgb_grayscale, 0.7, heatmap_jet, 0.3, 0, dtype=3)
+                        else:
+                            dest = cv2.addWeighted((test_image_plot*255).astype(np.uint8), 0.7, heatmap_jet, 0.3, 0,dtype=3)
 
-                    # format name
-                    f_name = indexs[ind].decode() if type(indexs[ind]) == bytes else indexs[ind]
-                    f_name = f_name if type(f_name) == str else str(f_name)
-                    f_name = f_name.split('.')[0] if '.' in f_name else f_name # Sometimes the index is a file path
+                        # format name
+                        f_name = indexs[ind].decode() if type(indexs[ind]) == bytes else indexs[ind]
+                        f_name = f_name if type(f_name) == str else str(f_name)
+                        f_name = f_name.split('.')[0] if '.' in f_name else f_name # Sometimes the index is a file path
 
-                    out_img = "index_{1}_prob_{0}.png".format(int(pred_values[ind]*100),f_name)
+                        out_img = "index_{1}_prob_{0}.png".format(int(pred_values[ind]*100),f_name)
 
-                    img_out_path = os.path.join(imgs_f,out_img)
-                    cv2.imwrite(img_out_path,dest)
+                        img_out_path = os.path.join(imgs_f,out_img)
+                        cv2.imwrite(img_out_path,dest)
 
                     if (counter % 100 == 0):
                         print("Image {0}".format(counter))
@@ -287,6 +293,17 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder):
             except tf.errors.OutOfRangeError as err:
                 print("Ended")
                 break
+
+            if out_pickle:
+                import pickle
+                print("Saving Vis files")
+                out_imgs = os.path.join(out_folder,"vis_img.npy")
+                out_indexs = os.path.join(out_folder,"indexs.pkl")
+
+                np.save(out_imgs,np.vstack(out_list))
+                with open(out_indexs,'wb') as f:
+                    pickle.dump(index_list,f)
+                pass
 
 
 

@@ -61,7 +61,7 @@ class img_selector(Frame):
         self.current_mask = None
 
         self.size=1
-        self.factor = 3
+        self.factor = 10
         self.n_clases = 2 # dummy initial value. Updated when a model is loaded
 
         self.img_or = ImageTk.PhotoImage(image=PIL.Image.fromarray(np.random.rand(100,100,3).astype('uint8'), 'RGB'))

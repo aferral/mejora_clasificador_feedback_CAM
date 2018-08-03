@@ -217,7 +217,7 @@ class Abstract_model(ExitStack):
 
 class digits_clasifier(Abstract_model):
 
-    def __init__(self, dataset: Dataset, debug=False):
+    def __init__(self, dataset: Dataset, debug=False,name=None):
         super().__init__(dataset, debug,'digit_classifier')
 
         self.reg_factor = 0.1

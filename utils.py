@@ -1,6 +1,5 @@
 import time
 
-from IPython.display import clear_output, Image, display, HTML
 import tensorflow as tf
 import numpy as np
 import datetime

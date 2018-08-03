@@ -157,8 +157,14 @@ class Digits_Dataset(Dataset):
     def vis_shape(self):
         return [8,8]
 
+    def get_index_list(self):
+        files=[i for i in range(self.all_data_x.shape[0])]
+        return files
+
+
     def get_train_image_at(self, index):
-        return self.all_data_x[index]
+        label = self.all_data_y[index]
+        return self.all_data_x[index].reshape(1,8,8,1), [label]
 
     def get_data_range(self):
         return [0,16]
