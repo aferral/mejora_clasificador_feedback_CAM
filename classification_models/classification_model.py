@@ -177,7 +177,7 @@ class Abstract_model(ExitStack):
             except tf.errors.OutOfRangeError:
                 y_true=np.hstack(y_true)
                 y_pred=np.hstack(y_pred)
-                print("Validation set accuracy is {:.2f}%".format(accuracy_score(y_true,y_pred)))
+                print("Validation set accuracy is {:.2f}".format(accuracy_score(y_true,y_pred)))
                 print(confusion_matrix(y_true, y_pred))
                 break
 
@@ -358,6 +358,15 @@ class CWR_classifier(Abstract_model):
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
 
+def imshow_util_uint8(img_without_preproc,dataset):
+    """
+    Image from get_index_at (without preprocessing) gets transformed to UINT8 Image for cv2 imshow or plt imshow
+    :param img_without_preproc:
+    :param dataset:
+    :return:
+    """
+    t=imshow_util(img_without_preproc.reshape(dataset.vis_shape()), dataset.get_data_range())
+    return (t*255).astype(np.uint8)
 
 def imshow_util(x,minmaxrange):
     """

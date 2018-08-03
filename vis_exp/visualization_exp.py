@@ -224,6 +224,7 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_
 
     out_list = []
     index_list = []
+    label_list = []
 
     counter=0
     with timeit():
@@ -266,6 +267,7 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_
                     if out_pickle:
                         out_list.append(resized_map.flatten())
                         index_list.append(indexs[ind])
+                        label_list.append(y_real[ind])
                     else:
                         # Blend the visualization and the image with cv2
                         heatmap_jet = cv2.applyColorMap((resized_map*255).astype(np.uint8), cv2.COLORMAP_JET)
@@ -288,22 +290,25 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_
                     if (counter % 100 == 0):
                         print("Image {0}".format(counter))
                     counter+=1
+                    break
 
 
             except tf.errors.OutOfRangeError as err:
                 print("Ended")
                 break
 
-            if out_pickle:
-                import pickle
-                print("Saving Vis files")
-                out_imgs = os.path.join(out_folder,"vis_img.npy")
-                out_indexs = os.path.join(out_folder,"indexs.pkl")
+        if out_pickle:
+            import pickle
+            print("Saving Vis files")
+            out_imgs = os.path.join(out_folder,"vis_img.npy")
+            out_indexs = os.path.join(out_folder,"indexs.pkl")
+            out_labels = os.path.join(out_folder,"labels.npy")
 
-                np.save(out_imgs,np.vstack(out_list))
-                with open(out_indexs,'wb') as f:
-                    pickle.dump(index_list,f)
-                pass
+            np.save(out_imgs,np.vstack(out_list))
+            np.save(out_labels,np.array(label_list))
+            with open(out_indexs,'wb') as f:
+                pickle.dump(index_list,f)
+            pass
 
 
 
