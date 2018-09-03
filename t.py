@@ -13,8 +13,9 @@ from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
 from datasets.imagenet_data import Imagenet_Dataset
+from select_tool.config_data import model_obj_dict, dataset_obj_dict
 from utils import show_graph, now_string, timeit
-
+import json
 
 """
 # Install
@@ -103,65 +104,98 @@ TODO revisar como llevar a tf recrods CWR bien (multiplica size 10 veces)
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+def train_for_epochs(dataset,model_class,model_params,load_path,train_file_path):
+
+    with model_class(dataset,**model_params) as model:
+
+        if load_path:
+            model.load(load_path)
+
+        model.train(train_file_used=train_file_path)
+
+
+
+def do_train_config(config_path):
+    with open(config_path,'r') as f:
+        data=json.load(f)
+
+    t_mode = data["train_mode"]
+    t_params = data['train_params']
+    model_key = data['model_key']
+    model_params = data['model_params']
+    model_load_path = data['model_load_path']
+    dataset_key = data['dataset_key']
+    dataset_params = data['dataset_params']
+
+    batch_size = t_params['b_size'] if 'b_size' in t_params else 20
+    epochs = t_params['epochs'] if 'epochs' in t_params else 1
+
+    if t_mode == 'epochs':
+        model_class = model_obj_dict[model_key]
+        dataset_class = dataset_obj_dict[dataset_key]
+        dataset_obj = dataset_class(epochs,batch_size,**dataset_params)
+        train_for_epochs(dataset_obj,model_class,model_params,model_load_path,config_path)
+
+
 
 if __name__ == '__main__':
-    train=False
+    import argparse
 
-    # todo improve dataset get
-    # todo operate with cmd??? or use gitignored script
-    # todo mecanizar el with a algo mas facil de reproducir
-    # start to work on mnist or VOC
+    parser = argparse.ArgumentParser(description='Execute train config ')
+    parser.add_argument('train_config_json', help='The config_json to train')
 
-    # dataset = Digits_Dataset(epochs=20,batch_size=30)
-    # dataset = Cifar10_Dataset(20,40)
-    dataset = Imagenet_Dataset(20,30)
-
-    with vgg_16_batchnorm(dataset, debug=False,name='Imagenet_subset_vgg16_CAM') as model:
-
-        if train:
-            model.train()
-        else:
-            # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
-            #model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
-            model.load('./model/vgg16_classifier/29_May_2018__01_41')
-            # model.eval()
+    args = parser.parse_args()
+    do_train_config(args.train_config_json)
 
 
-            test_image,labels = dataset.get_train_image_at(0)[0]
-            test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
-
-            image_processed, prediction, cmaps = model.visualize(test_image)
-
-            image_processed_plot = imshow_util( image_processed.reshape(dataset.vis_shape()),dataset.get_data_range())
-
-            p_class = np.argmax(prediction)
-            print("Predicted {0} with score {1}".format(p_class,np.max(prediction)))
-            print(cmaps.shape)
-            print("CMAP: ")
-
-            import matplotlib.pyplot as plt
-            from skimage.transform import resize
-
-
-            plt.figure()
-            plt.imshow(image_processed_plot,cmap='gray')
-
-            plt.figure()
-            plt.imshow(test_image_plot,cmap='gray')
-
-
-            plt.figure()
-            plt.imshow(cmaps[0],cmap='jet',interpolation='none')
-
-            out_shape = list(test_image_plot.shape)
-            if len(test_image_plot.shape) == 3:
-                out_shape = out_shape[0:2]
-            print(out_shape)
-            resized_map = resize(cmaps[0],out_shape)
-            plt.figure()
-            plt.imshow(resized_map,cmap='jet')
-
-            fig, ax = plt.subplots()
-            ax.imshow(resized_map, cmap='jet',alpha=0.7)
-            ax.imshow(image_processed_plot,alpha=0.3,cmap='gray')
-            plt.show()
+#     # dataset = Digits_Dataset(epochs=20,batch_size=30)
+#     # dataset = Cifar10_Dataset(20,40)
+#     dataset = Imagenet_Dataset(20,30)
+#
+#
+#             test_image,labels = dataset.get_train_image_at(0)[0]
+#             test_image_plot = imshow_util( test_image.reshape(dataset.vis_shape()),dataset.get_data_range())
+#
+#             image_processed, prediction, cmaps = model.visualize(test_image)
+#
+#             image_processed_plot = imshow_util( image_processed.reshape(dataset.vis_shape()),dataset.get_data_range())
+#
+#             p_class = np.argmax(prediction)
+#             print("Predicted {0} with score {1}".format(p_class,np.max(prediction)))
+#             print(cmaps.shape)
+#             print("CMAP: ")
+#
+#             import matplotlib.pyplot as plt
+#             from skimage.transform import resize
+#
+#
+#             plt.figure()
+#             plt.imshow(image_processed_plot,cmap='gray')
+#
+#             plt.figure()
+#             plt.imshow(test_image_plot,cmap='gray')
+#
+#
+#             plt.figure()
+#             plt.imshow(cmaps[0],cmap='jet',interpolation='none')
+#
+#             out_shape = list(test_image_plot.shape)
+#             if len(test_image_plot.shape) == 3:
+#                 out_shape = out_shape[0:2]
+#             print(out_shape)
+#             resized_map = resize(cmaps[0],out_shape)
+#             plt.figure()
+#             plt.imshow(resized_map,cmap='jet')
+#
+#             fig, ax = plt.subplots()
+#             ax.imshow(resized_map, cmap='jet',alpha=0.7)
+#             ax.imshow(image_processed_plot,alpha=0.3,cmap='gray')
+#             plt.show()
+# with vgg_16_batchnorm(dataset, debug=False, name='Imagenet_subset_vgg16_CAM') as model:
+#     if train:
+#         model.train()
+#     else:
+#         # model.load('./model/check.meta','model/cifar10_classifier/23_May_2018__10_54')
+#         # model.load('./model/check.meta', 'model/digit_classifier/24_May_2018__15_48')
+#         model.load('./model/vgg16_classifier/29_May_2018__01_41')
+        # model.eval()

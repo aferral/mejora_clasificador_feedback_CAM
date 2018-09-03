@@ -41,7 +41,7 @@ class Abstract_generator:
                 cv2.imwrite(os.path.join(out_folder,'{0}__{1}.png'.format(ind,ind_out)),elem)
 
         exp_json = {'date' : datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'dataset' : str(dataset_object),
+                    'dataset' : str(dataset_object.__class__.__name__),
                     'mask_file' : str(mask_file),
                     'generator' : str(self.__class__.__name__)
                     }

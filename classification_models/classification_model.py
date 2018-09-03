@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+from datetime import datetime
 
 import tensorflow as tf
 import numpy as np
@@ -8,7 +9,7 @@ import os
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.dataset import Dataset, Digits_Dataset
 from utils import show_graph, now_string, timeit, do_profile
-
+import json
 
 class Abstract_model(ExitStack):
 
@@ -98,7 +99,7 @@ class Abstract_model(ExitStack):
 
 
     #@do_profile()
-    def train(self):
+    def train(self,train_file_used=None):
 
 
         saver = tf.train.Saver()
@@ -133,6 +134,14 @@ class Abstract_model(ExitStack):
         print("Saving model at {0}".format(path_model_checkpoint))
         os.makedirs(path_model_checkpoint,exist_ok=True)
         saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
+
+        # create train_result config
+        data = {'mask_files' : [],'train_file_used' : train_file_used}
+        out_folder = os.path.join('config_files','train_result')
+        os.makedirs(out_folder,exist_ok=True)
+        json_name = '{0}__{1}__{2}.json'.format(self.dataset.__class__.__name__,self.__class__.__name__,now)
+        with open(os.path.join(out_folder,json_name),'w') as f:
+            json.dump(data,f)
 
         return path_model_checkpoint
 

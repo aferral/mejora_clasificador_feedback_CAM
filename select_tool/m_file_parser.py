@@ -1,18 +1,14 @@
 import os
 import json
-from classification_models.classification_model import CWR_classifier, \
-    Abstract_model, imshow_util, digits_clasifier
-from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
-from datasets.cifar10_data import Cifar10_Dataset
-from datasets.cwr_dataset import CWR_Dataset
-from datasets.dataset import Dataset, Digits_Dataset
-from datasets.imagenet_data import Imagenet_Dataset
+
+from classification_models.classification_model import imshow_util
 from select_tool import ROOT_DIR
 import numpy as np
 import datetime
 import cv2
 import pickle
 
+from select_tool.config_data import dataset_obj_dict, model_obj_dict, m_config
 
 config_folder = os.path.join(ROOT_DIR,'model_files','config_files')
 masks_folder = os.path.join(ROOT_DIR,'model_files','mask_files')
@@ -22,33 +18,6 @@ os.makedirs(config_folder,exist_ok=True)
 os.makedirs(masks_folder,exist_ok=True)
 
 
-dataset_obj_dict = {
-    'CWR' : CWR_Dataset,
-    'Imagenet_subset' : Imagenet_Dataset,
-    'cifar10' : Cifar10_Dataset,
-    'digits' : Digits_Dataset,
-}
-
-model_obj_dict = {
-    'CWR_classifier': CWR_classifier,
-    "vgg_16_batchnorm" : vgg_16_batchnorm,
-    'digits' : digits_clasifier
-}
-
-default_keys = ['dataset_key','model_key','mask_files','dataset_params','model_params','model_load_path']
-default_values = [None,None,[],{},{},None]
-requiered = [True,True,False,False,False,False]
-
-
-# DEFAULT CONFIG DICTIONARY
-m_config = {
-    'dataset_key' : 'CWR',
-    'model_key' : 'CWR_classifier',
-    'mask_files' : [],
-    'dataset_params' : {},
-    'model_params' : {},
-    'model_load_path' : None
-}
 
 
 def create_empty_mask_file(mask_folder,dataset_key,classifier_key,name=None):
@@ -208,7 +177,7 @@ class model_manager_obj:
 
         image_processed, prediction, cmaps = self.classifier.visualize(test_image)
 
-        img_cam = imshow_util(image_processed.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
+        #img_cam = imshow_util(image_processed.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
 
         all_cams =[]
         for i in range(cmaps.shape[0]):
