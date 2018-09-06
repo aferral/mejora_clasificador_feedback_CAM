@@ -136,7 +136,9 @@ class Abstract_model(ExitStack):
         saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
 
         # create train_result config
-        data = {'mask_files' : [],'train_file_used' : train_file_used}
+        data = {'mask_files' : [],
+                'model_load_path' : path_model_checkpoint,
+                'train_file_used' : train_file_used}
         out_folder = os.path.join('config_files','train_result')
         os.makedirs(out_folder,exist_ok=True)
         json_name = '{0}__{1}__{2}.json'.format(self.dataset.__class__.__name__,self.__class__.__name__,now)

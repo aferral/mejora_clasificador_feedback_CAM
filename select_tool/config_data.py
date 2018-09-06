@@ -20,17 +20,15 @@ model_obj_dict = {
     'digits' : digits_clasifier
 }
 
-default_keys = ['dataset_key','model_key','mask_files','dataset_params','model_params','model_load_path']
-default_values = [None,None,[],{},{},None]
-requiered = [True,True,False,False,False,False]
+default_keys = ['mask_files','model_load_path','train_file_used']
+default_values = [[],None,None]
+requiered = [True,True,True]
 
 
 # DEFAULT CONFIG DICTIONARY
 m_config = {
-    'dataset_key' : 'CWR',
-    'model_key' : 'CWR_classifier',
     'mask_files' : [],
-    'dataset_params' : {},
-    'model_params' : {},
-    'model_load_path' : None
+    'model_load_path' : None,
+    'train_file_used' : None
 }
+

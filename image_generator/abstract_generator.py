@@ -11,6 +11,10 @@ from  datetime import datetime
 from datasets.imagenet_data import Imagenet_Dataset
 
 import sys
+
+from select_tool.config_data import dataset_obj_dict
+from utils import now_string
+
 path_m = os.path.abspath('../genm')
 print(path_m)
 sys.path.append(path_m)
@@ -20,16 +24,21 @@ from inpaint_model import InpaintCAModel
 class Abstract_generator:
 
 
-    def generate(self,dataset_object : Dataset,index_to_use,mask_file):
+    def generate(self, dataset_object : Dataset, index_list, mask_file,select_path):
 
-        out_folder = 'temp_gen' #todo add mask name , dataset_name, gen_name, datelocal
+        d_name=str(dataset_object.__class__.__name__)
+        gen_name=str(self.__class__.__name__)
+        f_name = '{0}_{1}_{2}'.format(d_name,gen_name,now_string())
+        out_folder = os.path.join('gen_images', f_name)
         os.makedirs(out_folder,exist_ok=True)
+
+        gen_dict = {}
 
         # open masks pickle
         with open(mask_file,'rb') as f:
             mask_dict = pickle.load(f)
 
-        for ind in index_to_use:
+        for ind in index_list:
             mask = mask_dict['masks'][ind]
             img = dataset_object.get_train_image_at(ind)[0][0] # returns (img,index) , img = [batch,w,h,c]
 
@@ -37,18 +46,22 @@ class Abstract_generator:
 
             cv2.imwrite(os.path.join(out_folder, '{0}__mask.png'.format(ind)), mask.astype(np.uint8)*255)
 
+            gen_dict[ind] = []
             for ind_out,elem in enumerate(result):
-                cv2.imwrite(os.path.join(out_folder,'{0}__{1}.png'.format(ind,ind_out)),elem)
+                out_path_img = os.path.join(out_folder,'{0}__{1}.png'.format(ind,ind_out))
+                cv2.imwrite(out_path_img,elem)
+                gen_dict[ind].append(out_path_img)
 
         exp_json = {'date' : datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'dataset' : str(dataset_object.__class__.__name__),
+                    'dataset' : d_name,
+                    'used_select' : select_path,
+                    'index_map' : gen_dict,
                     'mask_file' : str(mask_file),
-                    'generator' : str(self.__class__.__name__)
+                    'generator' : gen_name
                     }
         with open(os.path.join(out_folder,'exp_details.json'),'w') as f:
             json.dump(exp_json,f)
 
-        pass
 
     def generate_img_mask(self,img,mask):
         raise NotImplementedError()
@@ -60,7 +73,11 @@ class yu2018generative(Abstract_generator):
 
     def generate_img_mask(self,image,mask):
 
-        if len(image.shape) == 3:
+        if len(image.shape) == 2 or (image.shape[2] == 1):
+            image = np.stack([image[:,:].reshape(image.shape[0],image.shape[1]) for i in range(3)],axis=2)
+            mask = np.stack([mask[:,:].reshape(mask.shape[0],mask.shape[1]) for i in range(3)],axis=2)
+
+        if len(image.shape) == 3 and (len(mask.shape) != 3):
             mask =np.repeat(mask[:,:,np.newaxis],image.shape[2],axis=2)
         mask = mask.astype(np.uint8) * 255
 
@@ -79,6 +96,7 @@ class yu2018generative(Abstract_generator):
         mask = np.expand_dims(mask, 0)
         input_image = np.concatenate([image, mask], axis=2)
 
+        tf.reset_default_graph()
         sess_config = tf.ConfigProto()
         sess_config.gpu_options.allow_growth = True
         with tf.Session(config=sess_config) as sess:
@@ -101,11 +119,38 @@ class yu2018generative(Abstract_generator):
         return [out_img]
 
 if __name__ == '__main__':
-    t=yu2018generative()
+    import argparse
 
-    index_list = ['n02423022_5592.JPEG']
-    d_obj = Imagenet_Dataset(1, 1,data_folder = "./temp/imagenet_subset")
-    mask_file = 'model_files/mask_files/mask_dummy_Imagenet_subset_vgg_16_batchnorm_2018-08-01__11:14:41.pkl'
-    t.generate(d_obj,index_list,mask_file)
+    available_map = {'yu2018' : yu2018generative}
 
-    pass
+    parser = argparse.ArgumentParser(description='Execute generative')
+    parser.add_argument('select_config_json', help='The config_json to train')
+    parser.add_argument('method_name', help='Generative algorithm to use. Available: {0}'.format(list(available_map.keys())))
+
+    args = parser.parse_args()
+    config_path = args.select_config_json
+    method_name = args.method_name
+
+    with open(config_path,'r') as f:
+        data_select = json.load(f)
+
+    train_result_path = data_select['train_result_path']
+    mask_file = data_select['mask_file']
+    index_list = data_select['index_list']
+
+    with open(train_result_path,'r') as f:
+        data_t_r = json.load(f)
+        path_train_file = data_t_r["train_file_used"]
+
+        with open(path_train_file,'r') as f2:
+            data_train_file = json.load(f2)
+
+        d_k = data_train_file['dataset_key']
+        d_p = data_train_file['dataset_params']
+
+
+    t= available_map[method_name]()
+
+    d_obj = dataset_obj_dict[d_k](1,1,**d_p)
+    t.generate(d_obj,index_list,mask_file,config_path)
+

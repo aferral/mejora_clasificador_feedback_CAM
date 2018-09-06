@@ -10,10 +10,10 @@ import pickle
 
 from select_tool.config_data import dataset_obj_dict, model_obj_dict, m_config
 
-config_folder = os.path.join(ROOT_DIR,'model_files','config_files')
-masks_folder = os.path.join(ROOT_DIR,'model_files','mask_files')
+config_folder = os.path.join(ROOT_DIR,'config_files','train_result')
+masks_folder = os.path.join(ROOT_DIR,'config_files','mask_files')
 
-os.makedirs(os.path.join(ROOT_DIR,'model_files'),exist_ok=True)
+os.makedirs(os.path.join(ROOT_DIR,'config_files'),exist_ok=True)
 os.makedirs(config_folder,exist_ok=True)
 os.makedirs(masks_folder,exist_ok=True)
 
@@ -51,12 +51,19 @@ class model_manager_obj:
         # Check if json has all the keys
         assert (all([var in config_d.keys() for var in m_config.keys()]))
 
-        self.dataset_key = config_d['dataset_key']
-        self.classifier_key = config_d['model_key']
-        self.dataset_params = config_d['dataset_params']
-        self.classifier_params = config_d['model_params']
+        # open train_file
+        with open(config_d['train_file_used'],'r') as f:
+            train_f_d = json.load(f)
+
+        self.current_train_file = config_d['train_file_used']
         self.saved_model_path = config_d['model_load_path']
         self.mask_file_list = config_d['mask_files']
+
+        self.dataset_key = train_f_d['dataset_key']
+        self.classifier_key = train_f_d['model_key']
+        self.dataset_params = train_f_d['dataset_params']
+        self.classifier_params = train_f_d['model_params']
+
 
         # get dataset object
         dataset_obj = dataset_obj_dict[self.dataset_key](1, 1, **self.dataset_params)
@@ -68,7 +75,7 @@ class model_manager_obj:
 
         if len(self.mask_file_list) == 0:
             print("No mask files creating an empty mask file")
-            new_mask_file = create_empty_mask_file(masks_folder, config_d['dataset_key'], config_d['model_key'])
+            new_mask_file = create_empty_mask_file(masks_folder, self.dataset_key, self.classifier_key)
             self.mask_file_list.append(new_mask_file)
             self.update_config_file()
 
@@ -85,11 +92,8 @@ class model_manager_obj:
 
     def update_config_file(self):
         d={}
-        d['dataset_key'] = self.dataset_key
-        d['model_key'] = self.classifier_key
+        d['train_file_used'] = self.current_train_file
         d['mask_files'] = self.mask_file_list
-        d['dataset_params'] = self.dataset_params
-        d['model_params'] = self.classifier_params
         d['model_load_path'] = self.saved_model_path
 
         with open(self.current_config_file, 'w') as f:

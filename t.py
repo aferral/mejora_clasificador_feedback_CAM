@@ -141,6 +141,10 @@ def do_train_config(config_path):
 if __name__ == '__main__':
     import argparse
 
+    # generate gen_file (carpeta_con_imagenes, select_file_usado, modelo_usado )
+    # todo crear algoritmo de train especializado a gene file
+    # todo testear el sistema con caso CWR o cifar10
+
     parser = argparse.ArgumentParser(description='Execute train config ')
     parser.add_argument('train_config_json', help='The config_json to train')
 

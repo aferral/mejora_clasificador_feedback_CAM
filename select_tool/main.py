@@ -48,6 +48,7 @@ Creo que todos los dataset deberia tenre
 
 
 """
+# todo cambiar path a relativos en select export
 # todo agregar informacion extra en interfaz indexs
 # todo rename de mask files
 # todo anotar descripcion en mask file??
@@ -62,7 +63,8 @@ from classification_models.classification_model import Abstract_model
 from datasets.dataset import Dataset
 from select_tool.img_selector import img_selector
 from select_tool.m_file_parser import model_manager_obj, get_config_file_list, config_folder
-
+from utils import now_string
+import json
 
 class mask_select(Frame):
     def __init__(self, controller, current_model : model_manager_obj, master, *args, **kwargs):
@@ -110,6 +112,7 @@ class index_select(Frame):
         self.controller = controller
         self.current_model = current_model
 
+        from tkinter import EXTENDED
 
         #dibujar widget
         super().__init__(master, *args, **kwargs)
@@ -119,7 +122,7 @@ class index_select(Frame):
         Label(f_st, text="Current_filter: ").pack()
         f_st.pack()
 
-        self.listbox = Listbox(self, exportselection=False)
+        self.listbox = Listbox(self, exportselection=False,selectmode=EXTENDED)
         self.listbox.pack()
 
 
@@ -131,6 +134,7 @@ class index_select(Frame):
         f2=Frame(self)
         Button(f2, text='Filter').pack(side=LEFT)
         Button(f2,text='Clean Filter').pack(side=LEFT)
+        Button(f2, text='Export sel for gen',command=self.export_selection).pack(side=LEFT)
         f2.pack()
 
         f3=Frame(self)
@@ -143,6 +147,23 @@ class index_select(Frame):
         self.listbox.event_generate("<<ListboxSelect>>")
         self.listbox.bind('<<ListboxSelect>>', self.selection)
 
+    def export_selection(self):
+        sel_files_folder = os.path.join('config_files','select_files')
+        os.makedirs(sel_files_folder,exist_ok=True)
+
+        sel_list = self.listbox.curselection()
+        index_list = [self.listbox.get(ind) for ind in sel_list]
+        print("Exporting list for image generator. List: {0}".format(index_list))
+        now_s = now_string()
+        out_selection_file = {'index_list' : index_list,
+                              'train_result_path': self.current_model.current_config_file,
+                              'details' : '',
+                              'mask_file' : self.current_model.current_mask_file}
+        sel_file_name = "{0}_{1}_{2}_selection.json".format(self.current_model.classifier_key,self.current_model.dataset_key,now_s)
+        sel_path = os.path.join(sel_files_folder,sel_file_name)
+        with open(sel_path,'w') as f:
+            json.dump(out_selection_file,f)
+        print("Select in {0}".format(sel_path))
 
     def update_model(self, current_model):
         self.model = current_model
@@ -191,7 +212,6 @@ class model_select(Frame):
         self.controller = controller
         self.model_list = model_list
         self.current_model = current_model
-
 
         # Dibujar widget
         super().__init__(master, *args, **kwargs)
