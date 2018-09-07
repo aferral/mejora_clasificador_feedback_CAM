@@ -59,6 +59,7 @@ class Abstract_generator:
                     'mask_file' : str(mask_file),
                     'generator' : gen_name
                     }
+        print("Results in "+str(os.path.join(out_folder,'exp_details.json')))
         with open(os.path.join(out_folder,'exp_details.json'),'w') as f:
             json.dump(exp_json,f)
 

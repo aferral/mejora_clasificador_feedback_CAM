@@ -120,10 +120,15 @@ class CWR_Dataset(Dataset):
         :return:
         """
         if len(image_batch.shape) == 4 and image_batch.shape[1:] != (96,96,1):
-            assert (False),'batch shape wrong'
+            assert (False),'wrong batch shape'
 
-        if len(image_batch.shape) == 3 and image_batch.shape != (96,96,1):
-            assert(False),'batch shape wrong'
+        if len(image_batch.shape) == 3:
+            if image_batch.shape == (96, 96, 3):
+                image_batch = np.mean(image_batch,axis=2).reshape(96,96,1)
+            elif image_batch.shape == (96, 96, 1):
+                pass
+            else:
+                assert(False),'wrong batch shape'
 
         return (image_batch - self.mean)/255
 

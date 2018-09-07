@@ -16,7 +16,7 @@ class Dataset:
 
         assert (not (self.train_dataset is None)), "Dataset must define a train_dataset"
         assert (not (self.valid_dataset is None)), "Dataset must define a validation_dataset"
-        assert (not (self.dataset_test is None)), "Dataset must define a test_dataset)"
+        assert (not (self.dataset_test is None)), "Dataset must define a test_dataset"
 
     @abstractmethod
     def preprocess_batch(self,image_batch):
@@ -77,6 +77,46 @@ class Dataset:
         raise NotImplementedError()
 
 
+class one_use_images(Dataset):
+
+    @property
+    def shape(self):
+        return self.base.shape
+
+    @property
+    def shape_target(self):
+        return self.base.shape_target
+
+
+    def __init__(self,index_list,image_list,label_list,base_database : Dataset,**kwargs):
+
+        self.base = base_database # type: Dataset
+        n_classes = base_database.shape_target[0]
+
+        # check all images in image_list has the same shape
+        for ind in range(len(image_list)-1):
+            assert(image_list[ind].shape == image_list[ind+1].shape)
+
+        batch_size = 20
+
+        image_data = np.vstack(np.array(image_list)[np.newaxis,...])
+        image_labels = np.array(label_list)
+        assert(len(image_data.shape) == 4)
+
+        # Create dataset objects
+        dx_train = tf.data.Dataset.from_tensor_slices(tf.cast(image_data,tf.float32))
+        dy_train = tf.data.Dataset.from_tensor_slices(tf.one_hot(image_labels,n_classes))
+        indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list)
+
+        self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).batch(batch_size)
+
+        self.dataset_test = self.valid_dataset = self.train_dataset
+
+        # Create iterator
+        self.iterator = tf.data.Iterator.from_structure(self.train_dataset.output_types,self.train_dataset.output_shapes)
+
+        # check parameters
+        super().__init__(**kwargs)
 
 
 

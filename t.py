@@ -1,5 +1,6 @@
 from contextlib import ExitStack
-
+import random
+import cv2
 import tensorflow as tf
 import numpy as np
 import os
@@ -11,7 +12,7 @@ from classification_models.vgg16_edited import vgg_16_CAM
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset
-from datasets.dataset import Dataset, Digits_Dataset
+from datasets.dataset import Dataset, Digits_Dataset, one_use_images
 from datasets.imagenet_data import Imagenet_Dataset
 from select_tool.config_data import model_obj_dict, dataset_obj_dict
 from utils import show_graph, now_string, timeit
@@ -121,20 +122,96 @@ def do_train_config(config_path):
 
     t_mode = data["train_mode"]
     t_params = data['train_params']
-    model_key = data['model_key']
-    model_params = data['model_params']
-    model_load_path = data['model_load_path']
-    dataset_key = data['dataset_key']
-    dataset_params = data['dataset_params']
 
-    batch_size = t_params['b_size'] if 'b_size' in t_params else 20
-    epochs = t_params['epochs'] if 'epochs' in t_params else 1
 
     if t_mode == 'epochs':
+
+        model_key = data['model_key']
+        model_params = data['model_params']
+        model_load_path = data['model_load_path']
+        dataset_key = data['dataset_key']
+        dataset_params = data['dataset_params']
+
+        batch_size = t_params['b_size'] if 'b_size' in t_params else 20
+        epochs = t_params['epochs'] if 'epochs' in t_params else 1
+
         model_class = model_obj_dict[model_key]
         dataset_class = dataset_obj_dict[dataset_key]
         dataset_obj = dataset_class(epochs,batch_size,**dataset_params)
         train_for_epochs(dataset_obj,model_class,model_params,model_load_path,config_path)
+
+    elif t_mode == "gen_train":
+        gen_file = t_params['gen_file']
+
+        with open(gen_file) as f:
+            data_gen=json.load(f)
+
+
+        used_select = data_gen['used_select']
+        with open(used_select) as f:
+            data_select=json.load(f)
+        train_result_path = data_select['train_result_path']
+        with open(train_result_path,'r') as f:
+            data_t_r = json.load(f)
+            path_train_file = data_t_r["train_file_used"]
+
+            with open(path_train_file,'r') as f2:
+                data_train_file = json.load(f2)
+            m_k = data_train_file['model_key']
+            m_p = data_train_file['model_params']
+            d_k = data_train_file['dataset_key']
+            d_p = data_train_file['dataset_params']
+
+        model_load_path = data_t_r['model_load_path']
+
+        batch_size = t_params['b_size'] if 'b_size' in t_params else 20
+        epochs = t_params['epochs'] if 'epochs' in t_params else 1
+
+        model_class = model_obj_dict[m_k]
+        dataset_class = dataset_obj_dict[d_k]
+        dataset_obj = dataset_class(epochs,batch_size,**d_p) # type: Dataset
+
+
+        images = []
+        labels=[]
+        index_list=[]
+        for img_index in data_gen['index_map']: # iterate the generated images adding to dataset
+
+            # also place the original image
+            original_img, original_label = dataset_obj.get_train_image_at(img_index)
+            images.append(original_img[0])
+            labels.append(int(original_label))
+            index_list.append(img_index)
+
+
+            image_path_list = data_gen['index_map'][img_index]
+            for ind_gen,img_path in enumerate(sorted(image_path_list)):
+
+                img = cv2.imread(img_path)
+                # preprocess images to same format of dataset_obj
+                result_img = dataset_obj.preprocess_batch(img)
+
+                images.append(result_img)
+                labels.append(int(original_label))
+                index_list.append("{0}_gen{1}".format(img_index,ind_gen))
+
+
+        n_normal=2
+        index_list = dataset_obj.get_index_list()
+
+        for i in range(n_normal):
+            ind_c=random.choice(index_list)
+            original_img, original_label = dataset_obj.get_train_image_at(ind_c)
+            images.append(original_img[0])
+            labels.append(int(original_label))
+            index_list.append(ind_c)
+
+        # Create dummy dataset add all gen_images and random images
+        dataset_one_use = one_use_images(index_list,images,labels,dataset_obj)
+
+        with model_class(dataset_one_use, **m_p) as model: # this also save the train_result
+            model.load(model_load_path)
+            model.train(train_file_used=config_path)
 
 
 
