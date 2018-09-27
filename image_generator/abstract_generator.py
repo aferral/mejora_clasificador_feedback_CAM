@@ -8,8 +8,6 @@ import pickle
 from datasets.dataset import Dataset
 from  datetime import datetime
 
-from datasets.imagenet_data import Imagenet_Dataset
-
 import sys
 
 from select_tool.config_data import dataset_obj_dict
@@ -65,6 +63,12 @@ class Abstract_generator:
 
 
     def generate_img_mask(self,img,mask):
+        """
+        Generate image replacing masked parts of image
+        :param img: Image WITHOUT preprocessing
+        :param mask: binary mask of shape of image
+        :return:
+        """
         raise NotImplementedError()
 
 class yu2018generative(Abstract_generator):
@@ -97,27 +101,31 @@ class yu2018generative(Abstract_generator):
         mask = np.expand_dims(mask, 0)
         input_image = np.concatenate([image, mask], axis=2)
 
-        tf.reset_default_graph()
-        sess_config = tf.ConfigProto()
-        sess_config.gpu_options.allow_growth = True
-        with tf.Session(config=sess_config) as sess:
-            input_image = tf.constant(input_image, dtype=tf.float32)
-            output = model.build_server_graph(input_image)
-            output = (output + 1.) * 127.5
-            output = tf.reverse(output, [-1])
-            output = tf.saturate_cast(output, tf.uint8)
-            # load pretrained model
-            vars_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-            assign_ops = []
-            for var in vars_list:
-                vname = var.name
-                from_name = vname
-                var_value = tf.contrib.framework.load_variable(self.generative_model_path, from_name)
-                assign_ops.append(tf.assign(var, var_value))
-            sess.run(assign_ops)
-            result = sess.run(output)
-            out_img = result[0][:, :, ::-1]
-        return [out_img]
+
+
+        temp_graph = tf.Graph()
+        with temp_graph.as_default():
+            sess_config = tf.ConfigProto()
+            sess_config.gpu_options.allow_growth = True
+
+            with tf.Session(config=sess_config) as sess:
+                input_image = tf.constant(input_image, dtype=tf.float32)
+                output = model.build_server_graph(input_image)
+                output = (output + 1.) * 127.5
+                output = tf.reverse(output, [-1])
+                output = tf.saturate_cast(output, tf.uint8)
+                # load pretrained model
+                vars_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+                assign_ops = []
+                for var in vars_list:
+                    vname = var.name
+                    from_name = vname
+                    var_value = tf.contrib.framework.load_variable(self.generative_model_path, from_name)
+                    assign_ops.append(tf.assign(var, var_value))
+                sess.run(assign_ops)
+                result = sess.run(output)
+                out_img = result[0][:, :, ::-1]
+            return [out_img]
 
 if __name__ == '__main__':
     import argparse

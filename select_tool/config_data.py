@@ -1,5 +1,6 @@
 from classification_models.classification_model import CWR_classifier, \
-    Abstract_model, imshow_util, digits_clasifier
+    Abstract_model, digits_clasifier
+from utils import imshow_util
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset

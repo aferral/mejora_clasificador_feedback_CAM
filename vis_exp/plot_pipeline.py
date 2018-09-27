@@ -2,7 +2,7 @@ import os
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import numpy as np
-from classification_models.classification_model import imshow_util_uint8
+from utils import imshow_util_uint8
 from datasets.cwr_dataset import CWR_Dataset
 from datasets.dataset import Dataset
 

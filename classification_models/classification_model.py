@@ -1,16 +1,15 @@
 from contextlib import ExitStack
-from datetime import datetime
 
 import tensorflow as tf
 import numpy as np
 import os
 
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
-from datasets.cifar10_data import Cifar10_Dataset
-from datasets.dataset import Dataset, Digits_Dataset
-from utils import show_graph, now_string, timeit, do_profile
+from datasets.dataset import Dataset
+from utils import show_graph, now_string, timeit
 import json
-
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
 class Abstract_model(ExitStack):
 
     def __init__(self, dataset: Dataset, debug=False, save_name=None):
@@ -19,19 +18,25 @@ class Abstract_model(ExitStack):
         self.dataset = dataset
         self.debug = debug
         self.save_folder=save_name
+        self.graph = None
+        self.current_log = ''
 
     def get_name(self):
         return self.save_folder
 
     def __enter__(self):
 
+        self.graph=self.dataset.graph
+        self.enter_context(self.graph.as_default())
+
         if tf.get_default_session():
             self.sess = tf.get_default_session()
         else:
             self.sess = tf.Session()
 
-        super().__enter__()
         self.enter_context(self.sess.as_default())
+
+        super().__enter__()
 
         #Build network
         self.define_arch_base()
@@ -41,7 +46,7 @@ class Abstract_model(ExitStack):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sess.close()
         # DELETE GRAPH
-        tf.reset_default_graph()
+        # tf.reset_default_graph()
         super().__exit__(exc_type, exc_val, exc_tb)
 
     def define_arch_base(self):
@@ -99,9 +104,9 @@ class Abstract_model(ExitStack):
 
 
     #@do_profile()
-    def train(self,train_file_used=None):
+    def train(self,train_file_used=None,save_model=True,eval=True):
 
-
+        self.current_log=''
         saver = tf.train.Saver()
 
         self.dataset.initialize_iterator_train(self.sess)
@@ -117,35 +122,44 @@ class Abstract_model(ExitStack):
 
 
                     if i % 50 == 0:
-                        print("It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100))
+                        log ="It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100)
+                        self.current_log += '{0} \n'.format(log)
+                        print(log)
+
                     i += 1
                 except tf.errors.OutOfRangeError:
-                    print('break at {0}'.format(i))
+                    log = 'break at {0}'.format(i)
+                    self.current_log += '{0} \n'.format(log)
+                    print(log)
                     break
 
 
         # Eval in val set
-        self.eval()
+        if eval:
+            self.eval()
 
 
         # Save model
-        now = now_string()
-        path_model_checkpoint = os.path.join('model',self.save_folder,now)
-        print("Saving model at {0}".format(path_model_checkpoint))
-        os.makedirs(path_model_checkpoint,exist_ok=True)
-        saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
+        if save_model:
+            now = now_string()
+            path_model_checkpoint = os.path.join('model',self.save_folder,now)
+            print("Saving model at {0}".format(path_model_checkpoint))
+            os.makedirs(path_model_checkpoint,exist_ok=True)
+            saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
 
-        # create train_result config
-        data = {'mask_files' : [],
-                'model_load_path' : path_model_checkpoint,
-                'train_file_used' : train_file_used}
-        out_folder = os.path.join('config_files','train_result')
-        os.makedirs(out_folder,exist_ok=True)
-        json_name = '{0}__{1}__{2}.json'.format(self.dataset.__class__.__name__,self.__class__.__name__,now)
-        with open(os.path.join(out_folder,json_name),'w') as f:
-            json.dump(data,f)
+            # create train_result config
+            data = {'mask_files' : [],
+                    'model_load_path' : path_model_checkpoint,
+                    'train_file_used' : train_file_used}
+            out_folder = os.path.join('config_files','train_result')
+            os.makedirs(out_folder,exist_ok=True)
+            json_name = '{0}__{1}__{2}.json'.format(self.dataset.__class__.__name__,self.__class__.__name__,now)
+            with open(os.path.join(out_folder,json_name),'w') as f:
+                json.dump(data,f)
 
-        return path_model_checkpoint
+            return path_model_checkpoint
+        else:
+            return None
 
 
     def feed_forward_vis(self,image):
@@ -170,32 +184,51 @@ class Abstract_model(ExitStack):
         graph = tf.get_default_graph()
         show_graph(graph)
 
-    def eval(self):
-        from sklearn.metrics import confusion_matrix
-        from sklearn.metrics import accuracy_score
+    def eval(self,mode='val',samples=None):
 
-        self.dataset.initialize_iterator_val(self.sess)
+        assert(mode in ['val','train','test']),'Invalid mode choose train, val, test'
+        assert((samples is None) or (type(samples) == int)),'Samples must be int or None'
+        stop_at = -1 if samples is None else samples
+
+        if mode == 'val':
+            name='Validation'
+            self.dataset.initialize_iterator_val(self.sess)
+        elif mode == 'test':
+            name='Test'
+            self.dataset.initialize_iterator_test(self.sess)
+        else:
+            name='Training'
+            self.dataset.initialize_iterator_train(self.sess)
+
 
         y_true=[]
         y_pred=[]
+        iteration=0
         while True:
             try:
                 fd = self.prepare_feed(is_train=False,debug=self.debug)
                 true,pred = self.sess.run([self.targets,self.pred], fd)
                 y_true.append(np.argmax(true,axis=1))
                 y_pred.append(np.argmax(pred,axis=1))
+                iteration+=1
+                if stop_at == iteration:
+                    print('Stop at {0}'.format(iteration))
+                    break
 
             except tf.errors.OutOfRangeError:
-                y_true=np.hstack(y_true)
-                y_pred=np.hstack(y_pred)
-                print("Validation set accuracy is {:.2f}".format(accuracy_score(y_true,y_pred)))
-                print(confusion_matrix(y_true, y_pred))
                 break
+        y_true = np.hstack(y_true)
+        y_pred = np.hstack(y_pred)
+        out_string = ""
+        out_string += "{1} set accuracy is {0:.2f} \n".format(accuracy_score(y_true, y_pred), name)
+        out_string += "{0} \n".format(confusion_matrix(y_true, y_pred))
+        out_string += "\n \n \n"
+        print(out_string)
+        return out_string
 
 
 
-
-    def visualize(self,image):
+    def visualize(self,image,norm_cam=True):
         """
         Visualize CAM of image. The image should be a numpy without pre process.
         :param image:
@@ -220,7 +253,8 @@ class Abstract_model(ExitStack):
         for i in range(n_classes):
             temp = (conv_acts[:,:,:] * softmax_w[:, i]).sum(axis=2)
             # re scale to 0-1
-            temp = (temp - temp.min()) / (temp.max() - temp.min())
+            if norm_cam:
+                temp = (temp - temp.min()) / (temp.max() - temp.min())
             out_maps_per_class[i] = temp
 
         return img_proc,pred[0],(out_maps_per_class)
@@ -368,23 +402,4 @@ class CWR_classifier(Abstract_model):
         equality = tf.equal(prediction, tf.argmax(self.targets, 1))
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
 
-
-def imshow_util_uint8(img_without_preproc,dataset):
-    """
-    Image from get_index_at (without preprocessing) gets transformed to UINT8 Image for cv2 imshow or plt imshow
-    :param img_without_preproc:
-    :param dataset:
-    :return:
-    """
-    t=imshow_util(img_without_preproc.reshape(dataset.vis_shape()), dataset.get_data_range())
-    return (t*255).astype(np.uint8)
-
-def imshow_util(x,minmaxrange):
-    """
-    Convert image x to 0-1 float range given the min max original range (for imshow)
-    :param x: Image
-    :param minmaxrange:
-    :return:
-    """
-    return (x-minmaxrange[0]) / (minmaxrange[1] - minmaxrange[0])
 

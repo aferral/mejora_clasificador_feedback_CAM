@@ -3,8 +3,7 @@ import numpy as np
 import tensorflow as tf
 import os
 
-from classification_models.classification_model import imshow_util, \
-    CWR_classifier
+from classification_models.classification_model import CWR_classifier
 from classification_models.vgg16_edited import vgg_16_CAM
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
@@ -15,7 +14,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from skimage.util import invert
 
-from utils import timeit, do_profile, now_string
+from utils import timeit, do_profile, now_string, imshow_util
 
 """
 

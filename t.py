@@ -6,16 +6,18 @@ import numpy as np
 import os
 
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
-from classification_models.classification_model import imshow_util, \
-    CWR_classifier
+from classification_models.classification_model import CWR_classifier
 from classification_models.vgg16_edited import vgg_16_CAM
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
 from datasets.cwr_dataset import CWR_Dataset
-from datasets.dataset import Dataset, Digits_Dataset, one_use_images
+from datasets.dataset import Dataset, Digits_Dataset, placeholder_dataset
 from datasets.imagenet_data import Imagenet_Dataset
+from image_generator.abstract_generator import yu2018generative
 from select_tool.config_data import model_obj_dict, dataset_obj_dict
-from utils import show_graph, now_string, timeit
+from select_tool.img_selector import call_one_use_select
+
+from utils import show_graph, now_string, timeit, load_mask, imshow_util, get_img_cam_index, get_img_RAW_cam_index
 import json
 
 """
@@ -105,6 +107,41 @@ TODO revisar como llevar a tf recrods CWR bien (multiplica size 10 veces)
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+
+def create_lists(dataset, gen_map):
+    images = []
+    labels = []
+    index_list = []
+    for img_index in gen_map:  # iterate the generated images adding to dataset
+        # Place the original image
+        original_img, original_label = dataset.get_train_image_at(img_index)
+        images.append(original_img[0])
+        labels.append(int(original_label))
+        index_list.append(img_index)
+
+        image_path_list = gen_map[img_index]
+        for ind_gen, img_path in enumerate(sorted(image_path_list)):
+            img = cv2.imread(img_path)
+            images.append(img)
+            labels.append(int(original_label))
+            index_list.append("{0}_gen{1}".format(img_index, ind_gen))
+
+    n_normal = 2
+    all_indexs = dataset.get_index_list()
+    for i in range(n_normal):
+        ind_c = random.choice(all_indexs)
+        original_img, original_label = dataset.get_train_image_at(ind_c)
+        images.append(original_img[0])
+        labels.append(int(original_label))
+        index_list.append(ind_c)
+    return images, labels, index_list
+
+
+
+
+
+
+
 def train_for_epochs(dataset,model_class,model_params,load_path,train_file_path):
 
     with model_class(dataset,**model_params) as model:
@@ -137,8 +174,8 @@ def do_train_config(config_path):
 
         model_class = model_obj_dict[model_key]
         dataset_class = dataset_obj_dict[dataset_key]
-        dataset_obj = dataset_class(epochs,batch_size,**dataset_params)
-        train_for_epochs(dataset_obj,model_class,model_params,model_load_path,config_path)
+        base_dataset = dataset_class(epochs,batch_size,**dataset_params)
+        train_for_epochs(base_dataset,model_class,model_params,model_load_path,config_path)
 
     elif t_mode == "gen_train":
         gen_file = t_params['gen_file']
@@ -169,49 +206,169 @@ def do_train_config(config_path):
 
         model_class = model_obj_dict[m_k]
         dataset_class = dataset_obj_dict[d_k]
-        dataset_obj = dataset_class(epochs,batch_size,**d_p) # type: Dataset
+        base_dataset = dataset_class(epochs,batch_size,**d_p) # type: Dataset
 
 
-        images = []
-        labels=[]
-        index_list=[]
-        for img_index in data_gen['index_map']: # iterate the generated images adding to dataset
-
-            # also place the original image
-            original_img, original_label = dataset_obj.get_train_image_at(img_index)
-            images.append(original_img[0])
-            labels.append(int(original_label))
-            index_list.append(img_index)
-
-
-            image_path_list = data_gen['index_map'][img_index]
-            for ind_gen,img_path in enumerate(sorted(image_path_list)):
-
-                img = cv2.imread(img_path)
-                # preprocess images to same format of dataset_obj
-                result_img = dataset_obj.preprocess_batch(img)
-
-                images.append(result_img)
-                labels.append(int(original_label))
-                index_list.append("{0}_gen{1}".format(img_index,ind_gen))
-
-
-        n_normal=2
-        index_list = dataset_obj.get_index_list()
-
-        for i in range(n_normal):
-            ind_c=random.choice(index_list)
-            original_img, original_label = dataset_obj.get_train_image_at(ind_c)
-            images.append(original_img[0])
-            labels.append(int(original_label))
-            index_list.append(ind_c)
-
+        images, labels, index_list = create_lists(base_dataset, data_gen['index_map'])
         # Create dummy dataset add all gen_images and random images
-        dataset_one_use = one_use_images(index_list,images,labels,dataset_obj)
+        dataset_one_use = placeholder_dataset(base_dataset)
+
+        # paso 0 revisar indices en ventana select tool (anotar indices)
+        # paso 1 tener edit tool en ventana aparte
+
+        def eval_current_model(name,classifier, dataset, ind_image,ind_backprop,out_f,current_log,eval=False):
+
+            os.makedirs(out_f,exist_ok=True)
+            path_out_cams=os.path.join(out_f,'raw_cams')
+            os.makedirs(path_out_cams,exist_ok=True)
+
+
+            if eval:
+                out_string = classifier.eval(mode='test', samples=10)
+                with open(os.path.join(out_f,'eval.txt'),'a') as f:
+                    f.write(current_log)
+                    f.write(out_string)
+
+            img, all_cams, scores, r_label,raw_cams = get_img_RAW_cam_index(dataset, classifier, ind_image)
+            print(scores)
+            np.save(os.path.join(path_out_cams, '{1}_raw_vis_it_{0}.npy'.format(ind_backprop,name)), raw_cams)
+
+            plt.clf()
+            f, axs = plt.subplots(1, len(all_cams))
+            for ind in range(len(all_cams)):
+                # important cv2 make a BGR transform to RGB for matplotlib
+                img_colored = cv2.cvtColor(cv2.applyColorMap(all_cams[ind],cv2.COLORMAP_JET),cv2.COLOR_BGR2RGB)
+                l=r_label
+                scor="{0:.2f}".format(scores[ind])
+
+                axs[ind].set_title('R_l {0} Cls {1} -- {2}'.format(l,ind,scor),fontdict={'fontsize': 11})
+                axs[ind].imshow(img_colored)
+            plt.savefig(os.path.join(out_f,'{1}__it_{0}.png'.format(ind_backprop,name)), bbox_inches='tight', pad_inches=0)
+
+        # accion: seleccionar mascara desde (img,img_cam) -> mask
+        def sel_mask(img_cam, img_or):
+            mask = call_one_use_select(img_cam, img_or=img_or)
+            plt.figure()
+            plt.imshow(mask)
+            plt.show()
+            return mask
+
+        # accion: selecciona indice (indice) --> img,img_cams
+        def get_img_cam(index_image, dataset, classifier,ind):
+            img, label = dataset.get_train_image_at(index_image)
+            img_proc, all_cams, scores, r_label,raw_cams = get_img_RAW_cam_index(dataset, classifier, ind)
+
+            plt.figure()
+            plt.title('img_selected')
+            plt.imshow(img_proc)
+
+            f, axs = plt.subplots(1, len(all_cams))
+            for ind in range(len(all_cams)):
+                # Remember that cv2 make a BGR. Transform to RGB for matplotlib
+                img_colored = cv2.cvtColor(cv2.applyColorMap(all_cams[ind],cv2.COLORMAP_JET),cv2.COLOR_BGR2RGB)
+                l=r_label
+                scor="{0:.2f}".format(scores[ind])
+                axs[ind].set_title('R_label: {0} Class {1} -- {2}'.format(l,ind,scor))
+                axs[ind].imshow(img_colored)
+            # f.tight_layout()
+            plt.show()
+
+            return img,label,all_cams,scores,r_label
 
         with model_class(dataset_one_use, **m_p) as model: # this also save the train_result
             model.load(model_load_path)
-            model.train(train_file_used=config_path)
+            # dataset_one_use.prepare_dataset(index_list, images, labels)
+            # dataset_one_use.show_current()
+            # model.train(train_file_used=config_path,save_model=False,eval=True)
+
+
+            current_ind = None
+            current_img=None
+            current_label=None
+            current_cams=None
+            selected_cam=None
+            current_mask=None
+            gen_images=None
+            backprops=0
+            st_gen_index = None
+            gens=0
+
+            index_list = []
+            img_list = []
+            label_list = []
+
+            # accion: invocar ref_gen
+            gen_model = yu2018generative()
+
+            act = 'no_exit'
+            out_f = os.path.join('out_backprops', now_string())
+            while act != 'exit':
+                action_map = {'0' : 'sel_img',
+                              '1' : 'set_mask',
+                              '2':"gen_image",
+                              '3':'add_gen_to_dataset',
+                              '4':'flush_dataset',
+                              '5':'do_backprop',
+                              '6':'exit','7':'sel_cam'}
+                act=action_map.setdefault(input("Accion? {0}".format(sorted(action_map.items()))),'')
+
+                if act == 'sel_img':
+                    ind_sel = input("Index ?")
+                    img, label, all_cams, scores, r_label = get_img_cam(ind_sel, base_dataset, model,ind_sel)
+                    current_ind = ind_sel
+                    current_img = img[0]
+                    current_label=label
+                    current_cams = all_cams
+                elif act == 'sel_cam':
+                    selected_cam = int(input("Cam index ?"))
+
+                elif act == 'set_mask':
+                    cam_for_mask = np.squeeze(current_cams[selected_cam])
+                    current_img = np.squeeze(current_img)
+                    print(cam_for_mask.shape)
+                    print(current_img.shape)
+                    current_mask=sel_mask(cam_for_mask,current_img)
+
+                elif act == 'gen_image':
+                    gen_images = gen_model.generate_img_mask(current_img, current_mask)
+                    plt.figure()
+                    plt.title('Original')
+                    plt.imshow(current_img)
+
+                    for index_gen,gen_img in enumerate(gen_images):
+                        plt.figure()
+                        plt.title('gen_{0}'.format(index_gen))
+                        plt.imshow(gen_img)
+                    plt.show()
+
+                elif act == 'add_gen_to_dataset':
+                    for g_img in gen_images:
+                        n_index = "gen_id__{0}__bindex__{1}".format(current_ind,gens)
+                        index_list.append(n_index)
+                        st_gen_index = n_index if (st_gen_index is None) else st_gen_index
+                        gens += 1
+                        img_list.append(g_img)
+                        label_list.append(current_label)
+
+                elif act == 'flush_dataset':
+                    dataset_one_use.prepare_dataset(index_list, img_list, label_list)
+                    dataset_one_use.show_current()
+
+                    index_list = []
+                    img_list = []
+                    label_list = []
+
+                elif act == 'do_backprop':
+
+                    if backprops == 0:
+                        eval_current_model('real',model, base_dataset, current_ind, backprops, out_f,model.current_log,eval=True)
+                        eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f,model.current_log)
+                    backprops += 1
+                    model.train(train_file_used=config_path,save_model=False,eval=False)
+                    eval_current_model('real',model, base_dataset, current_ind,backprops,out_f,model.current_log,eval=True)
+                    eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f, model.current_log)
+
+
 
 
 

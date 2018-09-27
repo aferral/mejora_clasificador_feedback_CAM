@@ -5,12 +5,14 @@ import numpy as np
 import tensorflow as tf
 import os
 
+from utils import imshow_util
 
 
 class Dataset:
     def __init__(self,test_mode=False):
 
         self.test_mode=test_mode # All datasets return a single batch and end
+        self.graph = tf.get_default_graph() # use the same graph for dataset,model todo make an isolated graph
 
         assert(hasattr(self, 'iterator')),"Dataset must define a iterator"
 
@@ -41,6 +43,9 @@ class Dataset:
     def initialize_iterator_val(self,sess):
         self._prepare_iterator(sess,self.valid_dataset)
 
+    def initialize_iterator_test(self,sess):
+        self._prepare_iterator(sess,self.dataset_test)
+
     @abstractmethod
     def get_data_range(self):
         raise NotImplementedError()
@@ -68,7 +73,7 @@ class Dataset:
         raise NotImplementedError()
 
     @abstractmethod
-    def get_train_image_at(self,index):
+    def get_train_image_at(self,index) -> (np.array,list):
         """
         This function return an image in the trainset. Without the preprocessing step
         :param index:
@@ -77,8 +82,25 @@ class Dataset:
         raise NotImplementedError()
 
 
-class one_use_images(Dataset):
+class placeholder_dataset(Dataset):
 
+    def preprocess_batch(self, image_batch):
+        return self.base.preprocess_batch(image_batch)
+
+    def inverse_preprocess(self, image_batch):
+        return self.base.preprocess_batch(image_batch)
+
+    def get_data_range(self):
+        return self.base.get_data_range()
+
+    def vis_shape(self):
+        return self.base.vis_shape()
+
+    def get_index_list(self):
+        return self.base.get_index_list()
+
+    def get_train_image_at(self, index) -> (np.array, list):
+        return self.image_map[index]
     @property
     def shape(self):
         return self.base.shape
@@ -88,36 +110,77 @@ class one_use_images(Dataset):
         return self.base.shape_target
 
 
-    def __init__(self,index_list,image_list,label_list,base_database : Dataset,**kwargs):
+    def __init__(self,base_data : Dataset,**kwargs):
 
-        self.base = base_database # type: Dataset
-        n_classes = base_database.shape_target[0]
+        self.base = base_data # type: Dataset
+        self.train_dataset = self.valid_dataset = []
+
+        # test dataset is used for evaluation
+        self.dataset_test = self.base.dataset_test
+
+        # Create iterator
+        self.iterator = tf.data.Iterator.from_structure(self.base.train_dataset.output_types,self.base.train_dataset.output_shapes)
+
+        # check parameters
+        super().__init__(**kwargs)
+
+    def prepare_dataset(self,index_list,image_list,label_list):
+        """
+        :param index_list:
+        :param image_list: MUST BE UNPROCESSED IMAGES
+        :param label_list:
+        :return:
+        """
+        n_classes = self.base.shape_target[0]
+
+        batch_size = 20
+
+        # preprocess images
+        for ind in range(len(image_list)):
+            data_shape= self.base.shape
+            current_shape = image_list[ind].shape
+            if  data_shape != current_shape:
+                if len(current_shape) == 3 and (current_shape[2] == 3): # todo something more robust?
+                    image_list[ind] = image_list[ind].mean(axis=2).reshape(data_shape)
+                    print("RGB to grayscale")
+
+        #self.base.preprocess_batch(img)
+        image_list = [img for img in image_list]
 
         # check all images in image_list has the same shape
         for ind in range(len(image_list)-1):
-            assert(image_list[ind].shape == image_list[ind+1].shape)
+            assert(image_list[ind].shape == image_list[ind+1].shape),"{0} - {1}".format(image_list[ind].shape,image_list[ind+1].shape)
 
-        batch_size = 20
 
         image_data = np.vstack(np.array(image_list)[np.newaxis,...])
         image_labels = np.array(label_list)
         assert(len(image_data.shape) == 4)
 
+        self.current_imgs = image_data
+        self.current_labels = image_labels
+        self.current_indexs = index_list
+        self.image_map = {}
+        for i in range(len(self.current_imgs)):
+            self.image_map[self.current_indexs[i]] = ([self.current_imgs[i]],[self.current_labels[i]])
+
         # Create dataset objects
+        # todo is that cast to float32 the same for all?
         dx_train = tf.data.Dataset.from_tensor_slices(tf.cast(image_data,tf.float32))
         dy_train = tf.data.Dataset.from_tensor_slices(tf.one_hot(image_labels,n_classes))
         indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list)
 
         self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).batch(batch_size)
+        self.valid_dataset = self.train_dataset
 
-        self.dataset_test = self.valid_dataset = self.train_dataset
-
-        # Create iterator
-        self.iterator = tf.data.Iterator.from_structure(self.train_dataset.output_types,self.train_dataset.output_shapes)
-
-        # check parameters
-        super().__init__(**kwargs)
-
+    def show_current(self):
+        import matplotlib.pyplot as plt
+        for ind,img in enumerate(self.current_imgs):
+            # img_norm = self.base.inverse_preprocess(img)
+            img_for_plot = imshow_util(img.reshape(self.base.vis_shape()), self.base.get_data_range())
+            plt.figure()
+            plt.title("index: {0} lb: {1}".format(self.current_indexs[ind],self.current_labels[ind]))
+            plt.imshow(img_for_plot)
+        plt.show()
 
 
 class Digits_Dataset(Dataset):

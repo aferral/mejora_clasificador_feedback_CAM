@@ -1,7 +1,7 @@
 import os
 import json
 
-from classification_models.classification_model import imshow_util
+from utils import imshow_util, get_img_cam_index
 from select_tool import ROOT_DIR
 import numpy as np
 import datetime
@@ -173,23 +173,7 @@ class model_manager_obj:
         # check if index existe in index_list
         print("Getting {0}".format(index))
         assert (index in self.index_list)
-
-        batch_x, labels = self.dataset_obj.get_train_image_at(index)
-        test_image = batch_x[0]
-        r_label = labels[0]
-        img = imshow_util(test_image.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
-
-        image_processed, prediction, cmaps = self.classifier.visualize(test_image)
-
-        #img_cam = imshow_util(image_processed.reshape(self.dataset_obj.vis_shape()), self.dataset_obj.get_data_range())
-
-        all_cams =[]
-        for i in range(cmaps.shape[0]):
-            im = (cmaps[i]*255).astype(np.uint8)
-            t=cv2.resize(im, (img.shape[0], img.shape[1]))
-            all_cams.append(t)
-
-        return (img * 255).astype(np.uint8),all_cams,prediction,r_label
+        return get_img_cam_index(self.dataset_obj, self.classifier, index)
 
     def update_mask_file(self):
         print("Updating mask file {0}".format(self.current_mask_file))

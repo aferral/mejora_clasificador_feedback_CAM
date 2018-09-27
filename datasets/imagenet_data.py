@@ -4,8 +4,10 @@ import os
 from datasets.dataset import Dataset
 from tf_records_parser.cifar10 import LOCAL_FOLDER
 import numpy as np
+import json
 
-IMAGE_SHAPE = [224,224,3]
+IMAGE_SHAPE = [224, 224, 3]
+
 
 def parse_function(example_proto):
     features = {"image/encoded": tf.FixedLenFeature((), tf.string),
@@ -18,17 +20,19 @@ def parse_function(example_proto):
                 }
     parsed_features = tf.parse_single_example(example_proto, features)
 
-    image = tf.image.decode_jpeg(parsed_features["image/encoded"],channels=3)
+    image = tf.image.decode_jpeg(parsed_features["image/encoded"], channels=3)
 
     # tf.Assert(tf.shape(image)[2] == 3,[image])
-    reconst = tf.image.resize_images(image,IMAGE_SHAPE[0:2])
+    reconst = tf.image.resize_images(image, IMAGE_SHAPE[0:2])
 
-    reconst = tf.cast(reconst,tf.float32,name='image_reshaped')
+    reconst = tf.cast(reconst, tf.float32, name='image_reshaped')
 
-    return parsed_features["index"],reconst, parsed_features["image/label"]
+    return parsed_features["index"], reconst, parsed_features["image/label"]
+
 
 def get_records_folder():
-    return  os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset")
+    return os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset")
+
 
 def list_records():
     path_records = get_records_folder()
@@ -39,47 +43,54 @@ def list_records():
         os.listdir(path_records)))))
     return tfrecords
 
+
 class Imagenet_Dataset(Dataset):
 
-
-    def __init__(self,epochs,batch_size,data_folder=None,**kwargs):
+    def __init__(self, epochs, batch_size, data_folder=None, **kwargs):
         tfrecords = list_records()
         n_records = len(tfrecords)
 
         if data_folder:
             self.data_folder = data_folder
 
-        train_n_records = int(0.8*n_records)
-        val_n_records = int(0.1*n_records)
+            # load class_name -> label map
+            class_map = os.path.join(self.data_folder,"labelnames.json")
+            with open(class_map,'r') as f:
+                names_data=json.load(f)
+            self.class_name_map = {class_name : ind for (ind,class_name) in names_data.values()}
+
+
+
+        train_n_records = int(0.8 * n_records)
+        val_n_records = int(0.1 * n_records)
         test_n_records = n_records - train_n_records - val_n_records
-        assert(train_n_records != 0 and val_n_records != 0 and test_n_records !=0 )
+        assert (train_n_records != 0 and val_n_records != 0 and test_n_records != 0)
 
-
-        assert(train_n_records+val_n_records+test_n_records == n_records),"The train-val-test split must use all tf records."
+        assert (
+                    train_n_records + val_n_records + test_n_records == n_records), "The train-val-test split must use all tf records."
 
         train_records = tfrecords[0:train_n_records]
-        validation_records = tfrecords[train_n_records:train_n_records+val_n_records]
-        test_records = tfrecords[train_n_records+val_n_records:]
+        validation_records = tfrecords[train_n_records:train_n_records + val_n_records]
+        test_records = tfrecords[train_n_records + val_n_records:]
 
         dataset_train = tf.data.TFRecordDataset(train_records).map(parse_function)
         dataset_val = tf.data.TFRecordDataset(validation_records).map(parse_function)
         dataset_test = tf.data.TFRecordDataset(test_records).map(parse_function)
 
-
         # Calculate mean image, std image
-        mean_image_path = os.path.join(LOCAL_FOLDER,'mean_imagenet.npy')
+        mean_image_path = os.path.join(LOCAL_FOLDER, 'mean_imagenet.npy')
 
         if not os.path.exists(mean_image_path):
             sess = tf.get_default_session()
             temp_iterator = dataset_train.batch(10).make_one_shot_iterator().get_next()
             p_mean = np.zeros(IMAGE_SHAPE)
-            c=0
+            c = 0
 
             try:
                 while True:
-                    index,batch_x, batch_y = sess.run(temp_iterator)
-                    p_mean = p_mean + np.mean(batch_x,axis=0) # IMAGE_SHAPE
-                    c+=1
+                    index, batch_x, batch_y = sess.run(temp_iterator)
+                    p_mean = p_mean + np.mean(batch_x, axis=0)  # IMAGE_SHAPE
+                    c += 1
             except tf.errors.OutOfRangeError:
                 self.mean = (p_mean / c).astype(np.float32)
                 np.save(mean_image_path, self.mean)
@@ -88,20 +99,22 @@ class Imagenet_Dataset(Dataset):
             print("Mean image loaded from file")
             self.mean = np.load(mean_image_path)
 
-        def preprocess(index,x,y):
-            return (index,tf.add(x, -self.mean) /255,tf.one_hot(y,21))
+        def preprocess(index, x, y):
+            return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, 21))
 
         # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
         # .cache()
-        #.map(preprocess,num_parallel_calls=4).batch(batch_size)
-        #.prefetch(1)
-        #.shuffle(10)
+        # .map(preprocess,num_parallel_calls=4).batch(batch_size)
+        # .prefetch(1)
+        # .shuffle(10)
 
         # preprocesss
-        self.train_dataset = dataset_train.map(preprocess,num_parallel_calls=4).cache().repeat(epochs).batch(batch_size).prefetch(3)
-        self.valid_dataset = dataset_val.map(preprocess,num_parallel_calls=4).cache().repeat(1).batch(batch_size).prefetch(3)
-        self.dataset_test = dataset_test.map(preprocess,num_parallel_calls=4).cache().repeat(1).batch(batch_size).prefetch(3)
-
+        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=4).cache().repeat(epochs).batch(
+            batch_size).prefetch(3)
+        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=4).cache().repeat(1).batch(
+            batch_size).prefetch(3)
+        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=4).cache().repeat(1).batch(
+            batch_size).prefetch(3)
 
         # Create iterator
         iterator = self.iterator = tf.data.Iterator.from_structure(self.train_dataset.output_types,
@@ -110,55 +123,55 @@ class Imagenet_Dataset(Dataset):
         # check parameters
         super().__init__(**kwargs)
 
-    def preprocess_batch(self,image_batch):
+    def preprocess_batch(self, image_batch):
         """
         Process a new batch substract train_mean.
         :return:
         """
 
-        return (image_batch - self.mean) /255
+        return (image_batch - self.mean) / 255
 
-    def inverse_preprocess(self,image_batch):
+    def inverse_preprocess(self, image_batch):
         return (image_batch * 255) + self.mean
-
 
     @property
     def shape(self):
         return IMAGE_SHAPE
+
     @property
     def shape_target(self):
         return [21]
 
-
     def get_index_list(self):
-        assert(hasattr(self,'data_folder')), "Image folder undefined"
-        l=[]
+        assert (hasattr(self, 'data_folder')), "Image folder undefined"
+        l = []
         for folder in os.listdir(self.data_folder):
-            if os.path.isdir(os.path.join(self.data_folder,folder)):
-                for f_p in os.listdir(os.path.join(self.data_folder,folder)):
+            if os.path.isdir(os.path.join(self.data_folder, folder)):
+                for f_p in os.listdir(os.path.join(self.data_folder, folder)):
                     ext = f_p.split('.')[-1].lower()
                     if (ext == 'jpg') or (ext == 'jpeg'):
                         l.append(f_p)
         return l
 
-
-    def get_train_image_at(self, index): # index is image path
+    def get_train_image_at(self, index):  # index is image path
         # example: n02423022_7746.JPEG
         # n02423022_original_images
         assert (hasattr(self, 'data_folder')), "Image folder undefined"
         class_name = index.split('_')[0]
-        full_path = os.path.join(self.data_folder,"{0}_original_images".format(class_name),index)
-        img  = cv2.imread(full_path)
-        s=self.vis_shape()
-        img_out = cv2.resize(img,tuple(s[0:2])) # original image need resize
-        return img_out.reshape(1,s[0],s[1],s[2]), class_name
+        full_path = os.path.join(self.data_folder, "{0}_original_images".format(class_name), index)
+        img = cv2.imread(full_path)
+        s = self.vis_shape()
+        img_out = cv2.resize(img, tuple(s[0:2]))  # original image need resize
+
+        return img_out.reshape(1, s[0], s[1], s[2]), [self.class_name_map[class_name]]
 
     def get_data_range(self):
-        return [0,255]
+        return [0, 255]
 
     def vis_shape(self):
         return IMAGE_SHAPE
 
+
 if __name__ == '__main__':
     with tf.Session().as_default() as sess:
-        Imagenet_Dataset(1,10)
+        t = Imagenet_Dataset(1, 10)
