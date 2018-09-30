@@ -139,7 +139,7 @@ class placeholder_dataset(Dataset):
         for ind in range(len(image_list)):
             data_shape= self.base.shape
             current_shape = image_list[ind].shape
-            if  data_shape != current_shape:
+            if  tuple(data_shape) != current_shape:
                 if len(current_shape) == 3 and (current_shape[2] == 3): # todo something more robust?
                     image_list[ind] = image_list[ind].mean(axis=2).reshape(data_shape)
                     print("RGB to grayscale")

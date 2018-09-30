@@ -325,6 +325,7 @@ class controller:
 
 config_list = get_config_file_list()
 f_path = os.path.join(config_folder,config_list[0])
+print("Using: {0}".format(f_path))
 
 with model_manager_obj(f_path) as model_manager:
     central = controller(model_manager,config_list)

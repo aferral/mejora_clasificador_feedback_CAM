@@ -111,16 +111,18 @@ class model_manager_obj:
         self.current_mask_index_map = d['masks']
 
     def __enter__(self):
-        self.classifier.__enter__()
+        self.enter_to_classifier()
+        return self
 
+    def enter_to_classifier(self):
+        self.classifier.__enter__()
         # start TF session
         # load train weights if has model_load_path
         if not (self.saved_model_path is None):
             self.classifier.load(self.saved_model_path)
+            print('Classifier loaded : {0}'.format(self.saved_model_path))
         else:
-            print("Model load path is None. Using initialized weights")
-
-        return self
+            print("Classifier load path is None. Using initialized weights")
 
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -132,7 +134,8 @@ class model_manager_obj:
 
         # open new classifier
         self.load_from_file(path)
-        self.classifier.__enter__()
+
+        self.enter_to_classifier()
 
     def get_n_classes(self):
         return self.dataset_obj.shape_target[0]
