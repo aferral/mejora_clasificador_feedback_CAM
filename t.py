@@ -108,6 +108,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
+# todo que hacer con labels
 def create_lists(dataset, gen_map):
     images = []
     labels = []
@@ -135,10 +136,6 @@ def create_lists(dataset, gen_map):
         labels.append(int(original_label))
         index_list.append(ind_c)
     return images, labels, index_list
-
-
-
-
 
 
 
@@ -199,7 +196,13 @@ def do_train_config(config_path):
             d_k = data_train_file['dataset_key']
             d_p = data_train_file['dataset_params']
 
-        model_load_path = data_t_r['model_load_path']
+        if data['model_load_path'] is not None:
+            model_load_path = data['model_load_path']
+            print("Using model load path from TRAIN_FILE {0}".format(model_load_path))
+        else:
+            model_load_path = data_t_r['model_load_path']
+            print("Using model load path from SELECT_FILE {0}".format(model_load_path))
+
 
         batch_size = t_params['b_size'] if 'b_size' in t_params else 20
         epochs = t_params['epochs'] if 'epochs' in t_params else 1
@@ -209,7 +212,7 @@ def do_train_config(config_path):
         base_dataset = dataset_class(epochs,batch_size,**d_p) # type: Dataset
 
 
-        images, labels, index_list = create_lists(base_dataset, data_gen['index_map'])
+        # images, labels, index_list = create_lists(base_dataset, data_gen['index_map'])
         # Create dummy dataset add all gen_images and random images
         dataset_one_use = placeholder_dataset(base_dataset)
 
