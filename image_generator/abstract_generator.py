@@ -73,7 +73,6 @@ class Abstract_generator:
 
 class yu2018generative(Abstract_generator):
     def __init__(self):
-        self.virtal_env_source_path = 'venv/bin/activate'
         self.generative_model_path = '../genm/model_logs/release_imagenet_256'
 
     def generate_img_mask(self,image,mask):

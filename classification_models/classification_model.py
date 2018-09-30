@@ -136,7 +136,7 @@ class Abstract_model(ExitStack):
 
         # Eval in val set
         if eval:
-            self.eval()
+            out_string = self.eval()
 
 
         # Save model
@@ -146,6 +146,11 @@ class Abstract_model(ExitStack):
             print("Saving model at {0}".format(path_model_checkpoint))
             os.makedirs(path_model_checkpoint,exist_ok=True)
             saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
+
+            # save accuracy in val set
+            if eval:
+                with open(os.path.join(path_model_checkpoint,"accuracy_val.txt"),'w') as f:
+                    f.write(out_string)
 
             # create train_result config
             data = {'mask_files' : [],

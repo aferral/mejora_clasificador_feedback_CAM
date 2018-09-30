@@ -18,7 +18,7 @@ Werkzeug==0.14.1
 matplotlib==2.2.2
 scikit-image==0.13.1
 ipykernel
-opencv-python==3.4.0
+opencv-python>=3.4.0,<3.5
 Pillow
 # for generative model
 git+https://github.com/JiahuiYu/neuralgym
