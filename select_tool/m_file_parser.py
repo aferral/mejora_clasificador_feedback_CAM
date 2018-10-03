@@ -1,6 +1,5 @@
 import os
 import json
-
 from utils import imshow_util, get_img_cam_index
 from select_tool import ROOT_DIR
 import numpy as np

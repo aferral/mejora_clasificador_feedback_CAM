@@ -219,7 +219,7 @@ def do_train_config(config_path):
         # paso 0 revisar indices en ventana select tool (anotar indices)
         # paso 1 tener edit tool en ventana aparte
 
-        def eval_current_model(name,classifier, dataset, ind_image,ind_backprop,out_f,current_log,eval=False):
+        def eval_current_model(name,classifier, dataset, ind_image,ind_backprop,out_f,current_log,set_cam_index,eval=False):
 
             os.makedirs(out_f,exist_ok=True)
             path_out_cams=os.path.join(out_f,'raw_cams')
@@ -232,20 +232,37 @@ def do_train_config(config_path):
                     f.write(current_log)
                     f.write(out_string)
 
+
             img, all_cams, scores, r_label,raw_cams = get_img_RAW_cam_index(dataset, classifier, ind_image)
             print(scores)
-            np.save(os.path.join(path_out_cams, '{1}_raw_vis_it_{0}.npy'.format(ind_backprop,name)), raw_cams)
+            np.save(os.path.join(path_out_cams,
+                                 '{1}_raw_vis_it_{0}.npy'.format(ind_backprop,
+                                                                 name)),
+                    raw_cams)
+
+
+
+            ind_selected = int(set_cam_index)
+            img_colored = cv2.cvtColor(
+                cv2.applyColorMap(all_cams[ind_selected], cv2.COLORMAP_JET),
+                cv2.COLOR_BGR2RGB)
+            plt.imshow(img_colored)
+            plt.savefig(os.path.join(out_f, 'Selected_{0}.png'.format(
+                ind_backprop)))
+
 
             plt.clf()
             f, axs = plt.subplots(1, len(all_cams))
             for ind in range(len(all_cams)):
                 # important cv2 make a BGR transform to RGB for matplotlib
+
                 img_colored = cv2.cvtColor(cv2.applyColorMap(all_cams[ind],cv2.COLORMAP_JET),cv2.COLOR_BGR2RGB)
                 l=r_label
                 scor="{0:.2f}".format(scores[ind])
 
                 axs[ind].set_title('R_l {0} Cls {1} -- {2}'.format(l,ind,scor),fontdict={'fontsize': 11})
                 axs[ind].imshow(img_colored)
+
             plt.savefig(os.path.join(out_f,'{1}__it_{0}.png'.format(ind_backprop,name)), bbox_inches='tight', pad_inches=0)
 
         # accion: seleccionar mascara desde (img,img_cam) -> mask
@@ -354,6 +371,8 @@ def do_train_config(config_path):
                         label_list.append(current_label)
 
                 elif act == 'flush_dataset':
+                    # import ipdb
+                    # ipdb.set_trace()
                     dataset_one_use.prepare_dataset(index_list, img_list, label_list)
                     dataset_one_use.show_current()
 
@@ -364,12 +383,12 @@ def do_train_config(config_path):
                 elif act == 'do_backprop':
 
                     if backprops == 0:
-                        eval_current_model('real',model, base_dataset, current_ind, backprops, out_f,model.current_log,eval=True)
-                        eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f,model.current_log)
+                        eval_current_model('real',model, base_dataset, current_ind, backprops, out_f,model.current_log,selected_cam,eval=True)
+                        eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f,model.current_log,selected_cam)
                     backprops += 1
                     model.train(train_file_used=config_path,save_model=False,eval=False)
-                    eval_current_model('real',model, base_dataset, current_ind,backprops,out_f,model.current_log,eval=True)
-                    eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f, model.current_log)
+                    eval_current_model('real',model, base_dataset, current_ind,backprops,out_f,model.current_log,selected_cam,eval=True)
+                    eval_current_model('gen', model, dataset_one_use, st_gen_index, backprops, out_f, model.current_log,selected_cam)
 
 
 

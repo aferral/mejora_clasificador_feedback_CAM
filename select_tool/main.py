@@ -324,7 +324,7 @@ class controller:
 # Load tuples (dataset, model) in config file
 
 config_list = get_config_file_list()
-f_path = os.path.join(config_folder,config_list[1])
+f_path = os.path.join(config_folder,config_list[3])
 print("Using: {0}".format(f_path))
 
 with model_manager_obj(f_path) as model_manager:

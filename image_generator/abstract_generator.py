@@ -85,7 +85,7 @@ class yu2018generative(Abstract_generator):
             mask =np.repeat(mask[:,:,np.newaxis],image.shape[2],axis=2)
         mask = mask.astype(np.uint8) * 255
 
-        ng.get_gpus(1)
+        # ng.get_gpus(1)
 
         model = InpaintCAModel()
 

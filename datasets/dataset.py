@@ -166,8 +166,8 @@ class placeholder_dataset(Dataset):
         # Create dataset objects
         # todo is that cast to float32 the same for all?
         dx_train = tf.data.Dataset.from_tensor_slices(tf.cast(image_data,tf.float32))
-        dy_train = tf.data.Dataset.from_tensor_slices(tf.one_hot(image_labels,n_classes))
-        indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list)
+        dy_train = tf.data.Dataset.from_tensors(tf.squeeze(tf.one_hot(image_labels,n_classes)))
+        indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list) # todo esto es robusto para todos los casos?
 
         self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).batch(batch_size)
         self.valid_dataset = self.train_dataset
