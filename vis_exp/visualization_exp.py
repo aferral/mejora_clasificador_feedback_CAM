@@ -212,8 +212,7 @@ def exp_CAM_eval(dataset,classifier,out_folder):
 
                 break
 
-
-def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_class=None):
+def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_class=None,use_real_label=False):
 
     dataset.initialize_iterator_val(model.sess)
 
@@ -235,8 +234,12 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_
                 tensors=[model.indexs,model.input_l,model.last_conv, model.softmax_weights, model.targets, model.pred]
                 indexs,images,conv_acts,softmax_w,y_real ,y_pred = model.sess.run(tensors, fd)
 
-                pred_class = np.ones((y_pred.shape[0],1)) * x_class if x_class else np.argmax(y_pred,axis=1)
-                pred_values = np.max(y_pred,axis=1)
+                if use_real_label:
+                    pred_class = np.argmax(y_real,axis=1).astype(np.int)
+                    pred_values = y_pred[np.arange(60),pred_class]
+                else:
+                    pred_class = np.ones((y_pred.shape[0],1)) * x_class if x_class else np.argmax(y_pred,axis=1)
+                    pred_values = np.max(y_pred,axis=1)
 
                 batch_s = conv_acts.shape[0]
                 n_filters = softmax_w.shape[0]
@@ -289,7 +292,6 @@ def visualize_dataset_CAM_predicted(dataset,model,out_folder,out_pickle=False,x_
                     if (counter % 100 == 0):
                         print("Image {0}".format(counter))
                     counter+=1
-                    break
 
 
             except tf.errors.OutOfRangeError as err:
@@ -361,7 +363,6 @@ if __name__ == '__main__':
 
         # model.load('.','model/Imagenet_subset_vgg16_CAM/29_May_2018__15_16')
         # model.load('./model/check.meta','./model/vgg16_classifier/29_May_2018__01_41')
-        model.load('./model/CWR_Clasifier/14_Jun_2018__13_36')
-
+        model.load('./model/CWR_Clasifier/04_Oct_2018__18_11')
         # exp_CAM_eval(dataset, model,out_path_folder)
-        visualize_dataset_CAM_predicted(dataset, model, out_path_folder)
+        visualize_dataset_CAM_predicted(dataset, model, out_path_folder,out_pickle=True,use_real_label=True)
