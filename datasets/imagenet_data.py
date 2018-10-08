@@ -30,6 +30,11 @@ def parse_function(example_proto):
     return parsed_features["index"], reconst, parsed_features["image/label"]
 
 
+def get_n_classes():
+    class_map = os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset", "labelnames.json")
+    with open(class_map, 'r') as f:
+        names_data = json.load(f)
+    return len(names_data)
 def get_records_folder():
     return os.path.join(LOCAL_FOLDER, "tfrecords_imagenet_subset")
 
@@ -49,6 +54,8 @@ class Imagenet_Dataset(Dataset):
     def __init__(self, epochs, batch_size, data_folder=None, **kwargs):
         tfrecords = list_records()
         n_records = len(tfrecords)
+        self.n_classes = get_n_classes()
+        print("Loaded {0} classes".format(self.n_classes))
 
         if data_folder:
             self.data_folder = data_folder
@@ -100,7 +107,7 @@ class Imagenet_Dataset(Dataset):
             self.mean = np.load(mean_image_path)
 
         def preprocess(index, x, y):
-            return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, 21))
+            return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, self.n_classes))
 
         # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
         # .cache()
@@ -109,11 +116,12 @@ class Imagenet_Dataset(Dataset):
         # .shuffle(10)
 
         # preprocesss
-        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=4).cache().repeat(epochs).batch(
+        shuffle_buffer = int(self.n_classes*1000*0.8)
+        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(epochs).batch(
             batch_size).prefetch(3)
-        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=4).cache().repeat(1).batch(
+        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(1).batch(
             batch_size).prefetch(3)
-        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=4).cache().repeat(1).batch(
+        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(1).batch(
             batch_size).prefetch(3)
 
         # Create iterator
@@ -140,7 +148,7 @@ class Imagenet_Dataset(Dataset):
 
     @property
     def shape_target(self):
-        return [21]
+        return [self.n_classes]
 
     def get_index_list(self):
         assert (hasattr(self, 'data_folder')), "Image folder undefined"

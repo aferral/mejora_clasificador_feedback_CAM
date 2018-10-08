@@ -143,6 +143,9 @@ class placeholder_dataset(Dataset):
                 if len(current_shape) == 3 and (current_shape[2] == 3): # todo something more robust?
                     image_list[ind] = image_list[ind].mean(axis=2).reshape(data_shape)
                     print("RGB to grayscale")
+                if len(current_shape) == 2 and (data_shape[2] == 1): # todo something more robust?
+                    image_list[ind] = image_list[ind].reshape(data_shape)
+                    print("Extend dummy dim")
 
         #self.base.preprocess_batch(img)
         image_list = [img for img in image_list]
@@ -153,7 +156,7 @@ class placeholder_dataset(Dataset):
 
 
         image_data = np.vstack(np.array(image_list)[np.newaxis,...])
-        image_labels = np.array(label_list)
+        image_labels = np.array(label_list).squeeze()
         assert(len(image_data.shape) == 4)
 
         self.current_imgs = image_data
@@ -166,7 +169,7 @@ class placeholder_dataset(Dataset):
         # Create dataset objects
         # todo is that cast to float32 the same for all?
         dx_train = tf.data.Dataset.from_tensor_slices(tf.cast(image_data,tf.float32))
-        dy_train = tf.data.Dataset.from_tensors(tf.squeeze(tf.one_hot(image_labels,n_classes)))
+        dy_train = tf.data.Dataset.from_tensor_slices(tf.squeeze(tf.one_hot(image_labels,n_classes)))
         indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list) # todo esto es robusto para todos los casos?
 
         self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).batch(batch_size)

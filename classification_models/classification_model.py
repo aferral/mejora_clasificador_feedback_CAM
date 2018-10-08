@@ -112,19 +112,23 @@ class Abstract_model(ExitStack):
         self.dataset.initialize_iterator_train(self.sess)
 
         i = 0
+        show_batch_dist = False
 
         with timeit() as t:
             while True:
                 try:
                     fd = self.prepare_feed(is_train=True,debug=self.debug)
 
-                    l, _, acc = self.sess.run([self.loss, self.train_step, self.accuracy], fd)
+                    l, _, acc,tgts = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets], fd)
 
 
-                    if i % 50 == 0:
+                    if i % 20 == 0:
+                        from collections import Counter
                         log ="It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100)
                         self.current_log += '{0} \n'.format(log)
                         print(log)
+                        if show_batch_dist:
+                            print(Counter(tgts.argmax(axis=1).tolist()))
 
                     i += 1
                 except tf.errors.OutOfRangeError:

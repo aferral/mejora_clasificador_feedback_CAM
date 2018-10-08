@@ -141,7 +141,7 @@ class CWR_Dataset(Dataset):
 
     def get_index_list(self):
         assert(hasattr(self,'data_folder')), "Image folder undefined"
-        files=os.listdir(self.data_folder)
+        files=list(filter(lambda x : x.split(".")[-1] == "jpg",os.listdir(self.data_folder)))
         return files
 
 

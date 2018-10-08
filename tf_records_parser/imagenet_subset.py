@@ -33,29 +33,14 @@ downloader = ImageNetDownloader()
 
 # class_name : (label_index, imagenet_index)  class_name-label_index can be anything imagenet_index should be valid
 subset = {
-"Gazella" : [0,"n02423022"],
-"Sea lion" : [1,"n02077923"],
-"Pandas" : [2,"n02509815"],
-"Elefante" : [3,"n02504458"] ,
-"Gato tigre" : [4,"n02123159"],
-"Coyote" : [5,"n02114855"],
-
-"Zebra" : [6,"n02391049"],
-"Gorila" : [7,"n02480855"],
-"Camello" : [8,"n02437312"],
-"Artic fox" : [9,"n02120079"],
-"Mono aullador" : [10,"n02492660"],
-"Armadillo" : [11,"n02454379"],
-"Red wolf" : [12,"n02114712"],
-"Llama" : [13,"n02437616"],
-
-"Otter" : [14,"n02444819"],
-"Toucan" : [15,"n01843383"],
-"Pavoreal" : [16,"n01806143"],
-"Buo gris" : [17,"n01622779"],
-"Aguila blanca" : [18,"n01614925"],
-"Manta raya" : [19,"n01498041"],
-"Tiburon martillo" : [20,"n01494475"],
+"grey wolf" : [0,"n02114367"],
+"white wolf" : [1,"n02114548"],
+"red wolf" : [2,"n02114712"],
+"coyote" : [3,"n02114855"] ,
+"red fox" : [4,"n02119022"],
+"grey fox" : [5,"n02120505"],
+"kit fox" : [6,"n02119789"],
+"Arctic fox" : [7,"n02120079"],
 }
 
 
@@ -102,12 +87,16 @@ def _add_to_tfrecord(filename, label_name,label_index, tfrecord_writer):
 
 
 def get_image_folders():
+    codes = list(map(lambda x  : x[1],subset.values()))
     folder_list=os.listdir(BASE_FOLDER)
+    folder_list = list(filter(lambda x : os.path.isdir(x),folder_list))
+    folder_list = list(filter(lambda x: x in codes, folder_list))
+
     return list(filter(lambda name : name[0] == 'n',folder_list))
 
 
 def download_subset(out_folder):
-    # # Download images
+    # Download images
     for values in subset.values():
         id_imagenet = values[1]
         downloader.downloadOriginalImages(id_imagenet, username, accessKey)
@@ -201,6 +190,7 @@ if __name__ == '__main__':
         print("k: {0} v: {1}".format(elem,subset[elem]))
     print("-------------")
     print("-------------")
+    print("{0} should be empty or doesnt exist to avoid errors".format(out_folder))
     input("Press ENTER to continue")
 
 

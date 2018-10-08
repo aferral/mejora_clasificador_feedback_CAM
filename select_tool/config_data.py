@@ -1,5 +1,6 @@
 from classification_models.classification_model import CWR_classifier, \
     Abstract_model, digits_clasifier
+from classification_models.custom_imagenet_subset import imagenet_classifier
 from utils import imshow_util
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
@@ -18,7 +19,8 @@ dataset_obj_dict = {
 model_obj_dict = {
     'CWR_classifier': CWR_classifier,
     "vgg_16_batchnorm" : vgg_16_batchnorm,
-    'digits' : digits_clasifier
+    'digits' : digits_clasifier,
+    "imagenet_custom" : imagenet_classifier
 }
 
 default_keys = ['mask_files','model_load_path','train_file_used']
