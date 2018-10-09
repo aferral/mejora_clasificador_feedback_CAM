@@ -28,8 +28,8 @@ def gabor_features_raw_data(kernels,dataset_obj : Dataset,img_shape):
 
 
         img,label = dataset_obj.get_train_image_at(indx)
-        # if not(label in ['1','3']):
-        #     continue
+        if not(label in ['1','3']):
+            continue
         indexs.append(indx)
         img = img / 255
         labels.append(int(label))
@@ -59,6 +59,12 @@ def gabor_features_raw_data(kernels,dataset_obj : Dataset,img_shape):
 
             # reducir a 8x8
             res = imresize(filtered, (8, 8))
+
+            # f,ax = plt.subplots(1,3)
+            # ax[0].imshow(cam_img)
+            # ax[1].imshow(kernel)
+            # ax[2].imshow(res)
+            # plt.show()
 
             # convertir a vector
             filter_vector = res.flatten()
@@ -156,24 +162,24 @@ if __name__ == '__main__':
     theta_params = [0]
     sigma_params = [1, 3,6]
 
+    freq_params = [0.05,0.125,0.25]
 
     # prepare filter bank kernels
     # theta_params = [0]
     # sigma_params = [1,3,6,8]
 
+    for frequency in freq_params:
+        f, ax = plt.subplots(len(theta_params), len(sigma_params))
+        ax = [[x for x in ax]] if len(theta_params) == 1 else ax
+        for ind_theta, theta in enumerate(theta_params):
+            theta = theta / 2. * np.pi
+            for ind_sigma, sigma in enumerate(sigma_params):
 
-    f, ax = plt.subplots(len(theta_params), len(sigma_params))
-    ax = [[x for x in ax]] if len(theta_params) == 1 else ax
-
-    for ind_theta, theta in enumerate(theta_params):
-        theta = theta / 2. * np.pi
-        for ind_sigma, sigma in enumerate(sigma_params):
-            for frequency in (0.05, 0.25):
-                kernel = np.real(gabor_kernel(frequency, theta=theta,
-                                              sigma_x=sigma, sigma_y=sigma))
-                kernels.append(kernel)
-                ax[ind_theta][ind_sigma].imshow(kernel)
-    plt.show()
+                    kernel = np.real(gabor_kernel(frequency, theta=theta,
+                                                  sigma_x=sigma, sigma_y=sigma))
+                    kernels.append(kernel)
+                    ax[ind_theta][ind_sigma].imshow(kernel)
+        plt.show()
 
 
 
@@ -184,8 +190,8 @@ if __name__ == '__main__':
         dataset, indexs_names, r_labels,vis = temp_d
 
     else:
-        dataset, indexs_names, r_labels,vis = gabor_features_cam_data(kernels,prefijo,cam_shape)
-        # dataset, indexs_names, r_labels, vis = gabor_features_raw_data(kernels,dataset_obj,cam_shape)
+        # dataset, indexs_names, r_labels,vis = gabor_features_cam_data(kernels,prefijo,cam_shape)
+        dataset, indexs_names, r_labels, vis = gabor_features_raw_data(kernels,dataset_obj,cam_shape)
 
         temp_d = [dataset, indexs_names, r_labels,vis]
         with open("temp.pkl",'wb') as f:

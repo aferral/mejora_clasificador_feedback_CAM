@@ -109,40 +109,40 @@ class Abstract_model(ExitStack):
         self.current_log=''
         saver = tf.train.Saver()
 
-        self.dataset.initialize_iterator_train(self.sess)
+
 
         i = 0
         show_batch_dist = False
 
         with timeit() as t:
-            while True:
-                try:
-                    fd = self.prepare_feed(is_train=True,debug=self.debug)
+            for i in range(10):
+                self.dataset.initialize_iterator_train(self.sess)
+                while True:
+                    try:
+                        fd = self.prepare_feed(is_train=True,debug=self.debug)
 
-                    l, _, acc,tgts = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets], fd)
+                        l, _, acc,tgts = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets], fd)
 
 
-                    if i % 20 == 0:
-                        from collections import Counter
-                        log ="It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100)
+                        if i % 20 == 0:
+                            from collections import Counter
+                            log ="It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100)
+                            self.current_log += '{0} \n'.format(log)
+                            print(log)
+                            if show_batch_dist:
+                                print(Counter(tgts.argmax(axis=1).tolist()))
+
+                        i += 1
+                    except tf.errors.OutOfRangeError:
+                        log = 'break at {0}'.format(i)
                         self.current_log += '{0} \n'.format(log)
                         print(log)
-                        if show_batch_dist:
-                            print(Counter(tgts.argmax(axis=1).tolist()))
+                        break
 
-                    i += 1
-                except tf.errors.OutOfRangeError:
-                    log = 'break at {0}'.format(i)
-                    self.current_log += '{0} \n'.format(log)
-                    print(log)
-                    break
-
-
-        # Eval in val set
-        if eval:
-            out_string = self.eval()
-
-
+                # Eval in val set
+                if eval:
+                    print("Doing eval")
+                    out_string = self.eval()
         # Save model
         if save_model:
             now = now_string()

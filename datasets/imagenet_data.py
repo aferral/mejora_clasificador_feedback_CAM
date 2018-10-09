@@ -69,7 +69,7 @@ class Imagenet_Dataset(Dataset):
 
 
         train_n_records = int(0.8 * n_records)
-        val_n_records = int(0.1 * n_records)
+        val_n_records = int(0.1 * n_records) if int(0.1 * n_records) > 0 else 1
         test_n_records = n_records - train_n_records - val_n_records
         assert (train_n_records != 0 and val_n_records != 0 and test_n_records != 0)
 

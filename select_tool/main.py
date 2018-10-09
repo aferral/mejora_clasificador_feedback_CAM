@@ -54,7 +54,7 @@ Creo que todos los dataset deberia tenre
 # todo anotar descripcion en mask file??
 # todo revisar tipos de objetos
 # todo requiero limpiar un modelo no en uso ????
-from tkinter import Widget, Frame, Toplevel, Label, Entry, Button
+from tkinter import Widget, Frame, Toplevel, Label, Entry, Button, RIGHT
 from tkinter import Tk, Listbox, END, mainloop
 import numpy as np
 from tkinter import LEFT,StringVar
@@ -112,7 +112,7 @@ class index_select(Frame):
         self.controller = controller
         self.current_model = current_model
 
-        from tkinter import EXTENDED
+        from tkinter import EXTENDED,Scrollbar,Y
 
         #dibujar widget
         super().__init__(master, *args, **kwargs)
@@ -122,9 +122,18 @@ class index_select(Frame):
         Label(f_st, text="Current_filter: ").pack()
         f_st.pack()
 
-        self.listbox = Listbox(self, exportselection=False,selectmode=EXTENDED)
-        self.listbox.pack()
+        frame_index_listbox = Frame(self)
+        self.listbox = Listbox(frame_index_listbox, exportselection=False,selectmode=EXTENDED)
+        self.listbox.pack(side=LEFT)
 
+        scrollbar = Scrollbar(frame_index_listbox)
+        scrollbar.pack(side=LEFT, fill=Y)
+        frame_index_listbox.pack()
+
+
+        # attach listbox to scrollbar
+        self.listbox.config(yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.listbox.yview)
 
         f=Frame(self)
         Label(f,text="Filtro: ").pack(side=LEFT)
@@ -324,7 +333,7 @@ class controller:
 # Load tuples (dataset, model) in config file
 
 config_list = get_config_file_list()
-f_path = os.path.join(config_folder,config_list[0])
+f_path = os.path.join(config_folder,config_list[-2])
 print("Using: {0}".format(f_path))
 
 with model_manager_obj(f_path) as model_manager:

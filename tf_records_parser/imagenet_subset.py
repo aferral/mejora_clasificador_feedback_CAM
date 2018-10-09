@@ -33,14 +33,10 @@ downloader = ImageNetDownloader()
 
 # class_name : (label_index, imagenet_index)  class_name-label_index can be anything imagenet_index should be valid
 subset = {
-"grey wolf" : [0,"n02114367"],
-"white wolf" : [1,"n02114548"],
-"red wolf" : [2,"n02114712"],
-"coyote" : [3,"n02114855"] ,
-"red fox" : [4,"n02119022"],
-"grey fox" : [5,"n02120505"],
-"kit fox" : [6,"n02119789"],
-"Arctic fox" : [7,"n02120079"],
+"white wolf" : [0,"n02114548"],
+"coyote" : [1,"n02114855"] ,
+"red fox" : [2,"n02119022"],
+"Arctic fox" : [3,"n02120079"],
 }
 
 

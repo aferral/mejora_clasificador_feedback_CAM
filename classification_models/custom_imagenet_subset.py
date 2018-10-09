@@ -25,21 +25,21 @@ def get_slim_arch_bn(inputs,isTrainTensor,num_classes=1000,scope='vgg_16'):
         with arg_scope([layers.conv2d, layers_lib.fully_connected, layers_lib.max_pool2d],
                        outputs_collections=end_points_collection):
             net = layers_lib.repeat(inputs, 2, layers.conv2d, filters, [3, 3], scope='conv1',weights_regularizer=slim.l2_regularizer(0.01))
-            bn_0 = tf.contrib.layers.batch_norm(net,center=True, scale=True,is_training=isTrainTensor,scope='bn1')
+            bn_0 = tf.contrib.layers.batch_norm(net,center=True, scale=True,is_training=isTrainTensor,scope='bn1', decay = 0.9)
             p_0 = layers_lib.max_pool2d(bn_0, [2, 2], scope='pool1')
 
             net = layers_lib.repeat(p_0, 2, layers.conv2d, filters, [3, 3], scope='conv2',weights_regularizer=slim.l2_regularizer(0.01))
-            bn_1 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn2')
+            bn_1 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn2', decay = 0.9)
             res_1 = p_0 + bn_1
             p_1 = layers_lib.max_pool2d(res_1, [2, 2], scope='pool2')
 
             net = layers_lib.repeat(p_1, 3, layers.conv2d, filters, [4, 4], scope='conv3',weights_regularizer=slim.l2_regularizer(0.01))
-            bn_2 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn3')
+            bn_2 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn3', decay = 0.9)
             res_2 = p_1 + bn_2
             p_2 = layers_lib.max_pool2d(res_2, [2, 2], scope='pool3')
 
             net = layers_lib.repeat(p_2, 3, layers.conv2d, filters, [5, 5], scope='conv4',weights_regularizer=slim.l2_regularizer(0.01))
-            bn_3 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn4')
+            bn_3 = tf.contrib.layers.batch_norm(net, center=True, scale=True,is_training=isTrainTensor,scope='bn4', decay = 0.9)
             res_3 = p_2 + bn_3
             p_3 = layers_lib.max_pool2d(res_3, [2, 2], scope='pool4')
 
