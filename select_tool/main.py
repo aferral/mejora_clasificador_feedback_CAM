@@ -182,7 +182,7 @@ class index_select(Frame):
 
 
         self.listbox.delete(0, END)
-        for item in self.index_list:
+        for item in sorted(self.index_list):
             self.listbox.insert(END, item)
 
     def next_prev(self,x):
@@ -333,7 +333,8 @@ class controller:
 # Load tuples (dataset, model) in config file
 
 config_list = get_config_file_list()
-f_path = os.path.join(config_folder,config_list[-2])
+print(config_list)
+f_path = os.path.join(config_folder,config_list[5])
 print("Using: {0}".format(f_path))
 
 with model_manager_obj(f_path) as model_manager:

@@ -36,19 +36,50 @@ class Replace_with_dataset_crops(Abstract_generator):
         self.gen_per_image = gen_per_image
         pass
 
+class insert_crop_random_image(Replace_with_dataset_crops):
+
+    def generate_img_mask(self, img, mask):
+        """
+        Take N random images in dataset and insert masked slide of img
+        :param img:
+        :param mask:
+        :return:
+        """
+
+        mask, img = try_to_adjust_to_shape_mask(img, mask)
+        mask = mask.astype(np.bool)
+        assert (img.shape == mask.shape),"Mask shape {0} != img shape {1}".format(mask.shape,img.shape)
+
+
+        out_images = []
+
+        for i in range(self.gen_per_image):
+            random_index = random.choice(self.index_list)
+            img_dataset,label = self.dataset.get_train_image_at(random_index)
+
+            img_dataset =  img_dataset[0]
+
+            img_dataset[mask] = img[mask]
+
+            out_images.append(img_dataset)
+
+        return out_images
+
+
+
 if __name__ == '__main__':
     import numpy as np
     import tensorflow as tf
     import matplotlib.pyplot as plt
     with tf.Session().as_default() as sess:
         dataset_obj = Imagenet_Dataset(1, 10,data_folder='./temp/imagenet_subset')
-        gen=Replace_with_dataset_crops(dataset_obj,3)
+        gen=insert_crop_random_image(dataset_obj,3)
 
         mask = np.zeros((224,224))
         mask[100:200,100:200] = 1
         mask=mask.astype(np.bool)
 
-        img_org,label = dataset_obj.get_train_image_at("n02114712_171.JPEG")
+        img_org,label = dataset_obj.get_train_image_at("n02114855_114.JPEG")
         img_org = img_org[0]
         plt.imshow(img_org)
         plt.show()

@@ -10,6 +10,38 @@ from utils import show_graph, now_string, timeit
 import json
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+
+
+def optimistic_restore(session, save_file):
+    """
+    Restore all the variables in saved file. Usefull for restore a model and add a
+    new layers. From https://gist.github.com/iganichev/d2d8a0b1abc6b15d4a07de83171163d4
+    :param session:
+    :param save_file:
+    :return:
+    """
+    reader = tf.train.NewCheckpointReader(save_file)
+    saved_shapes = reader.get_variable_to_shape_map()
+    var_names = sorted([(var.name, var.name.split(':')[0]) for
+                        var in tf.global_variables()
+                        if var.name.split(':')[0] in saved_shapes])
+    restore_vars = []
+    name2var = dict(zip(map(lambda x: x.name.split(':')[0],
+                            tf.global_variables()),
+                        tf.global_variables()))
+    with tf.variable_scope('', reuse=True):
+        for var_name, saved_var_name in var_names:
+            curr_var = name2var[saved_var_name]
+            var_shape = curr_var.get_shape().as_list()
+            if var_shape == saved_shapes[saved_var_name]:
+                restore_vars.append(curr_var)
+
+    saver = tf.train.Saver(restore_vars)
+    saver.restore(session, save_file)
+
+
+
+
 class Abstract_model(ExitStack):
 
     def __init__(self, dataset: Dataset, debug=False, save_name=None):
@@ -109,13 +141,11 @@ class Abstract_model(ExitStack):
         self.current_log=''
         saver = tf.train.Saver()
 
-
-
         i = 0
-        show_batch_dist = False
+        show_batch_dist = True
 
         with timeit() as t:
-            for i in range(10):
+            for i in range(1): # todo refactor
                 self.dataset.initialize_iterator_train(self.sess)
                 while True:
                     try:
@@ -186,9 +216,9 @@ class Abstract_model(ExitStack):
 
     def load(self, model_folder):
 
-
-        new_saver = tf.train.Saver()
-        new_saver.restore(self.sess, tf.train.latest_checkpoint(model_folder))
+        optimistic_restore(self.sess, tf.train.latest_checkpoint(model_folder))
+        # new_saver = tf.train.Saver()
+        # new_saver.restore(self.sess, tf.train.latest_checkpoint(model_folder))
 
         graph = tf.get_default_graph()
         show_graph(graph)

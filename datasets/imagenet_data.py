@@ -1,3 +1,5 @@
+import pickle
+
 import cv2
 import tensorflow as tf
 import os
@@ -73,8 +75,7 @@ class Imagenet_Dataset(Dataset):
         test_n_records = n_records - train_n_records - val_n_records
         assert (train_n_records != 0 and val_n_records != 0 and test_n_records != 0)
 
-        assert (
-                    train_n_records + val_n_records + test_n_records == n_records), "The train-val-test split must use all tf records."
+        assert (train_n_records + val_n_records + test_n_records == n_records), "The train-val-test split must use all tf records."
 
         train_records = tfrecords[0:train_n_records]
         validation_records = tfrecords[train_n_records:train_n_records + val_n_records]
@@ -86,25 +87,35 @@ class Imagenet_Dataset(Dataset):
 
         # Calculate mean image, std image
         mean_image_path = os.path.join(LOCAL_FOLDER, 'mean_imagenet.npy')
+        train_index_list_path = os.path.join(LOCAL_FOLDER, 'train_list.pkl')
 
         if not os.path.exists(mean_image_path):
             sess = tf.get_default_session()
             temp_iterator = dataset_train.batch(10).make_one_shot_iterator().get_next()
             p_mean = np.zeros(IMAGE_SHAPE)
             c = 0
+            train_index_list=[]
 
             try:
                 while True:
                     index, batch_x, batch_y = sess.run(temp_iterator)
                     p_mean = p_mean + np.mean(batch_x, axis=0)  # IMAGE_SHAPE
                     c += 1
+                    train_index_list += index.tolist()
             except tf.errors.OutOfRangeError:
                 self.mean = (p_mean / c).astype(np.float32)
+                self.train_index_list = train_index_list
                 np.save(mean_image_path, self.mean)
+                with open(train_index_list_path,'wb') as f:
+                    pickle.dump(train_index_list,f,-1)
                 print("Saved mean image")
+                print("Saved train index list")
         else:
             print("Mean image loaded from file")
+            print("Train index list loaded from file")
             self.mean = np.load(mean_image_path)
+            with open(train_index_list_path,'rb') as f:
+                self.train_index_list = pickle.load(f)
 
         def preprocess(index, x, y):
             return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, self.n_classes))
@@ -171,7 +182,9 @@ class Imagenet_Dataset(Dataset):
         s = self.vis_shape()
         img_out = cv2.resize(img, tuple(s[0:2]))  # original image need resize
 
-        return img_out.reshape(1, s[0], s[1], s[2]), [self.class_name_map[class_name]]
+        img_out_rgb=cv2.cvtColor(img_out,cv2.COLOR_BGR2RGB) # convert image from BGR to RGB
+
+        return img_out_rgb.reshape(1, s[0], s[1], s[2]), [self.class_name_map[class_name]]
 
     def get_data_range(self):
         return [0, 255]

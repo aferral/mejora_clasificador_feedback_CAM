@@ -116,6 +116,7 @@ class placeholder_dataset(Dataset):
         self.train_dataset = self.valid_dataset = []
 
         # test dataset is used for evaluation
+        self.valid_dataset = self.base.valid_dataset
         self.dataset_test = self.base.dataset_test
 
         # Create iterator
@@ -133,7 +134,7 @@ class placeholder_dataset(Dataset):
         """
         n_classes = self.base.shape_target[0]
 
-        batch_size = 20
+        batch_size = len(index_list) if len(index_list) < 60 else 60
 
         # preprocess images
         for ind in range(len(image_list)):
@@ -156,28 +157,39 @@ class placeholder_dataset(Dataset):
 
 
         image_data = np.vstack(np.array(image_list)[np.newaxis,...])
-        image_labels = np.array(label_list).squeeze()
+        image_labels = np.array(label_list)
         assert(len(image_data.shape) == 4)
 
         self.current_imgs = image_data
         self.current_labels = image_labels
         self.current_indexs = index_list
         self.image_map = {}
+        print(len(self.current_imgs),len(self.current_labels),len(self.current_indexs))
+        print(self.current_imgs.shape,self.current_labels.shape,self.current_indexs.shape)
         for i in range(len(self.current_imgs)):
             self.image_map[self.current_indexs[i]] = ([self.current_imgs[i]],[self.current_labels[i]])
 
         # Create dataset objects
         # todo is that cast to float32 the same for all?
         dx_train = tf.data.Dataset.from_tensor_slices(tf.cast(image_data,tf.float32))
-        dy_train = tf.data.Dataset.from_tensor_slices(tf.squeeze(tf.one_hot(image_labels,n_classes)))
+        dy_train = tf.data.Dataset.from_tensor_slices(tf.one_hot(image_labels,n_classes)[:,0,:] )
         indx_t_dataset = tf.data.Dataset.from_tensor_slices(index_list) # todo esto es robusto para todos los casos?
 
-        self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).batch(batch_size)
-        self.valid_dataset = self.train_dataset
+        # todo QUICK FIX FOR IMAGENET
+        def preprocess(index, x, y):
+            return (index, tf.add(x, -self.base.mean) / 255, y)
+
+        self.train_dataset = tf.data.Dataset.zip((indx_t_dataset, dx_train, dy_train)).map(preprocess).batch(batch_size)
 
     def show_current(self):
         import matplotlib.pyplot as plt
-        for ind,img in enumerate(self.current_imgs):
+        if len(self.current_imgs) > 5:
+            print("Too many images in dataset. Showing first 5")
+            to_show = self.current_imgs[0:5]
+        else:
+            to_show = self.current_imgs
+
+        for ind,img in enumerate(to_show):
             # img_norm = self.base.inverse_preprocess(img)
             img_for_plot = imshow_util(img.reshape(self.base.vis_shape()), self.base.get_data_range())
             plt.figure()

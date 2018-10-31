@@ -1,9 +1,11 @@
+import types
 from contextlib import ExitStack
 import random
 import cv2
 import tensorflow as tf
 import numpy as np
 import os
+import pickle
 
 # From http://adventuresinmachinelearning.com/tensorflow-dataset-tutorial/
 from classification_models.classification_model import CWR_classifier
@@ -19,6 +21,7 @@ from select_tool.img_selector import call_one_use_select
 
 from utils import show_graph, now_string, timeit, load_mask, imshow_util, get_img_cam_index, get_img_RAW_cam_index
 import json
+import random
 
 """
 # Install
@@ -108,6 +111,76 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
+
+def dropout_mask(d,cols_off):
+    t=np.ones((1,d))
+    off=len(cols_off)
+    est_kp = (d-off)*1.0 / d
+    t[0,cols_off] = 0
+    t[0,:] = t[0,:] / est_kp
+    return t
+
+def calc_dropout_mask(conv_acts,mask,k=5):
+
+    from scipy import interpolate
+
+    target_shape = mask.shape
+    assert(len(conv_acts.shape)==3)
+    assert(len(target_shape) == 2)
+    h, w,channels = conv_acts.shape
+
+    means=[]
+    # upsample each channel to mask size
+    for i in range(channels):
+        channel=conv_acts[:,:,i]
+
+
+        x = np.linspace(0,target_shape[0],h)
+        y = np.linspace(0,target_shape[1],w)
+        f = interpolate.interp2d(x, y, channel, kind='linear')
+
+        xnew = np.array(range(target_shape[0]))
+        ynew = np.array(range(target_shape[1]))
+        resampled_channel = f(xnew, ynew)
+
+        # mask with upsampled filter
+        mask_channel = resampled_channel[mask]
+
+        # calc mean per masked filter
+        means.append(mask_channel.mean())
+
+    means = np.array(means)
+    # select k highest means
+    k_hs = np.argsort(means)
+    selected = k_hs[-k:][::-1]
+
+    # create dropout mask
+    return dropout_mask(conv_acts.shape[2], selected)
+
+
+def get_feed_dict_fun(original_fun,mask,selected_cam_index,indexs_to_edit):
+    # todo dict of masks??
+    def manual_dropout(self, is_train=True, debug=True):
+        base_fd = original_fun(is_train=is_train, debug=True)
+        batch_size=base_fd['model_input:0'].shape[0]
+
+
+
+        conv_acts,softmax_w = self.sess.run([self.last_conv,self.softmax_weights], base_fd)
+        base_dropout_mask = np.ones((batch_size,conv_acts.shape[-1]))
+
+        for ind in indexs_to_edit:
+            weighted_acts = conv_acts[ind,:, :, :] * softmax_w[:, selected_cam_index]
+            dropout_mask = calc_dropout_mask(weighted_acts, mask, k=5)
+            base_dropout_mask[ind] = dropout_mask
+
+        base_fd['vgg_16/gap_mask:0'] = base_dropout_mask
+
+        return base_fd
+
+    return manual_dropout
+
+
 # todo que hacer con labels
 def create_lists(dataset, gen_map):
     images = []
@@ -168,7 +241,7 @@ def do_train_config(config_path):
 
         batch_size = t_params['b_size'] if 'b_size' in t_params else 20
         epochs = t_params['epochs'] if 'epochs' in t_params else 1
-        epochs = 1; # todo test code
+        epochs = 1 # todo test code
 
         model_class = model_obj_dict[model_key]
         dataset_class = dataset_obj_dict[dataset_key]
@@ -236,10 +309,15 @@ def do_train_config(config_path):
 
 
             if eval:
-                out_string = classifier.eval(mode='test', samples=10)
+                out_string = classifier.eval(mode='val')
                 with open(os.path.join(out_f,'eval.txt'),'a') as f:
-                    f.write(current_log)
-                    f.write(out_string)
+                    f.write("val: "+current_log)
+                    f.write("val: "+out_string)
+                out_string = classifier.eval(mode='test')
+                with open(os.path.join(out_f,'eval.txt'),'a') as f:
+                    f.write("test: "+current_log)
+                    f.write("test: "+out_string)
+
 
 
             img, all_cams, scores, r_label,raw_cams = get_img_RAW_cam_index(dataset, classifier, ind_image)
@@ -255,6 +333,7 @@ def do_train_config(config_path):
             img_colored = cv2.cvtColor(
                 cv2.applyColorMap(all_cams[ind_selected], cv2.COLORMAP_JET),
                 cv2.COLOR_BGR2RGB)
+            plt.clf()
             plt.imshow(img_colored)
             plt.savefig(os.path.join(out_f, 'Selected_{0}.png'.format(
                 ind_backprop)))
@@ -304,6 +383,109 @@ def do_train_config(config_path):
 
             return img,label,all_cams,scores,r_label
 
+        def do_backprop(model,base_dataset,dataset_one_use,current_ind,out_f,selected_cam,current_mask,use_selective_dropout,current_backprop,config_path):
+            if current_backprop == 0:
+                eval_current_model('real', model, base_dataset,
+                                   current_ind, current_backprop, out_f,
+                                   model.current_log, selected_cam,
+                                   eval=True)
+                eval_current_model('gen', model, dataset_one_use,
+                                   st_gen_index, current_backprop, out_f,
+                                   model.current_log, selected_cam)
+            current_backprop += 1
+
+            if use_selective_dropout:
+                assert(add_original),'Must add original for selective dropout'
+                batch_index_for_original = len(dataset_one_use.current_labels)-1
+                original_fun = model.prepare_feed
+                model.prepare_feed = types.MethodType(
+                    get_feed_dict_fun(original_fun, current_mask, selected_cam,[batch_index_for_original]),
+                    model)
+                model.train(train_file_used=config_path,
+                            save_model=False, eval=False)
+                model.prepare_feed = original_fun
+            else:
+                model.train(train_file_used=config_path,save_model=False, eval=False)
+
+
+            eval_current_model('real', model, base_dataset,
+                               current_ind, current_backprop, out_f,
+                               model.current_log, selected_cam,
+                               eval=True)
+            eval_current_model('gen', model, dataset_one_use,
+                               st_gen_index, current_backprop, out_f,
+                               model.current_log, selected_cam)
+            return current_backprop
+
+        def flush_to_dataset(dataset_one_use, index_list, img_list, label_list,add_original,show_data=False):
+            t_index_list = index_list.copy()
+            t_img_list = img_list.copy()
+            t_label_list = label_list.copy()
+
+            if add_original:
+                n_index = "original__{0}".format(current_ind)
+                print("Adding {0}".format(n_index))
+
+                t_index_list.append(n_index)
+                t_img_list.append(current_img)
+                t_label_list.append(current_label)
+
+            dataset_one_use.prepare_dataset(np.array(t_index_list),
+                                            np.array(t_img_list),
+                                            np.array(t_label_list))
+            if show_data:
+                dataset_one_use.show_current()
+
+        def generate_random_for_loop(base_dataset,current_ind,current_img,current_label,gens,current_mask,add_original=False,n_random=5,gen_imgs=2):
+
+
+            temp_index_list = []
+            temp_img_list = []
+            temp_label_list = []
+            n_gens = gens
+            st_gen_index = None
+
+            if add_original:
+                n_index = "original__{0}".format(current_ind)
+                print("Adding {0}".format(n_index))
+
+                temp_index_list.append(n_index)
+                temp_img_list.append(current_img)
+                temp_label_list.append(current_label)
+
+
+
+            # add random images to dataset
+            ind_list = base_dataset.get_index_list()  # type: List
+
+            for i in range(n_random):
+                random_index = random.choice(ind_list)
+                n_index = "gen_id__{0}__bindex__{1}".format(random_index, n_gens)
+                # print("Adding {0}".format(n_index))
+                random_img, random_label = base_dataset.get_train_image_at(random_index)
+                st_gen_index = n_index
+                n_gens += 1
+                temp_index_list.append(n_index)
+                temp_img_list.append(random_img[0])
+                temp_label_list.append(random_label)
+
+            # agregar trozo a imagenes aleatorias
+            if gen_imgs > 0:
+                temp_gen_model = get_generator_from_key('random_crop', dataset=base_dataset)
+                temp_gen_model.gen_per_image = gen_imgs
+                temp_gens = temp_gen_model.generate_img_mask(current_img,current_mask)
+                for g_img in temp_gens:
+                    n_index = "gen_id__{0}__bindex__{1}".format(current_ind,gens)
+                    print("Adding {0}".format(n_index))
+                    n_gens += 1
+                    temp_index_list.append(n_index)
+                    temp_img_list.append(g_img)
+                    temp_label_list.append(current_label)
+
+            print("Summary of added images: random {0} inverse {1} total {2}".format(n_random, gen_imgs, len(temp_label_list)))
+            return temp_index_list, temp_img_list, temp_label_list, n_gens, st_gen_index
+
+
         with model_class(dataset_one_use, **m_p) as model: # this also save the train_result
             model.load(model_load_path)
             # dataset_one_use.prepare_dataset(index_list, images, labels)
@@ -321,6 +503,8 @@ def do_train_config(config_path):
             backprops=0
             st_gen_index = None
             gens=0
+            use_selective_dropout = False
+            add_original=False
 
             index_list = []
             img_list = []
@@ -340,9 +524,13 @@ def do_train_config(config_path):
                           '6': 'exit', '7': 'sel_cam',
                           '8': 'sel_gen',
                           '9' : 'save_mask',
-                          '10' : 'load_mask'}
+                          '10' : 'load_mask',
+                          '11' : 'add_org_random_insert',
+                          '12' : 'loop random get X times',
+                          '13' : 'continue_training'}
 
             while act != 'exit':
+                plt.close('all')
                 try:
                     act = action_map.setdefault(
                         input("Accion? {0}".format(sorted(action_map.items()))),
@@ -353,21 +541,65 @@ def do_train_config(config_path):
                         img, label, all_cams, scores, r_label = get_img_cam(
                             ind_sel, base_dataset, model, ind_sel)
                         current_ind = ind_sel
-                        current_img = img[0]
+                        current_img = img[0].squeeze()
                         current_label = label
                         current_cams = all_cams
                     elif act == 'sel_cam':
                         selected_cam = int(input("Cam index ?"))
 
+                    elif act == 'add_org_random_insert':
+                        index_list, img_list, label_list, gens, st_gen_index = generate_random_for_loop(base_dataset, current_ind,current_img,current_label, gens,current_mask,add_original=add_original)
+
+                    elif act == 'continue_training':
+                        n_backpropagations = int(input("How many batches?"))
+
+                        for i in range(n_backpropagations):
+                            index_list, img_list, label_list, gens, st_gen_index = generate_random_for_loop(
+                                base_dataset, current_ind, current_img,current_label, gens,
+                                current_mask,n_random=20,gen_imgs=0)
+
+                            # flush
+                            flush_to_dataset(dataset_one_use, index_list,img_list, label_list, add_original)
+
+                            # do backpropagation
+                            backprops = do_backprop(model, base_dataset,
+                                                    dataset_one_use,
+                                                    current_ind, out_f,
+                                                    selected_cam, current_mask,
+                                                    use_selective_dropout,
+                                                    backprops, config_path)
+
+                    elif act == 'loop random get X times':
+
+                        n_backpropagations = int(input("How many times?"))
+
+                        for i in range(n_backpropagations):
+                            index_list, img_list, label_list, gens, st_gen_index = generate_random_for_loop(
+                                base_dataset, current_ind, current_img,current_label, gens,
+                                current_mask)
+
+                            # flush
+                            flush_to_dataset(dataset_one_use, index_list,img_list, label_list, add_original)
+
+                            # do backpropagation
+                            backprops = do_backprop(model, base_dataset,
+                                                    dataset_one_use,
+                                                    current_ind, out_f,
+                                                    selected_cam, current_mask,
+                                                    use_selective_dropout,
+                                                    backprops, config_path)
+
+
+                        pass
+
                     elif act == 'save_mask':
-                        import pickle
+
                         out_path=os.path.join('./config_files/mask_files/mask_from_gen_{0}.pkl'.format(now_string()))
                         with open(out_path,'wb') as f:
                             pickle.dump(current_mask,f)
                         print("Mask saved to {0}".format(out_path))
 
                     elif act == 'load_mask':
-                        import pickle
                         path_to_mask = input("Mask path?")
                         with open(path_to_mask,'rb') as f:
                             current_mask=pickle.load(f)
@@ -402,50 +634,21 @@ def do_train_config(config_path):
                         for g_img in gen_images:
                             n_index = "gen_id__{0}__bindex__{1}".format(
                                 current_ind, gens)
+                            print("Adding {0}".format(n_index))
                             index_list.append(n_index)
-                            st_gen_index = n_index if (
-                                        st_gen_index is None) else st_gen_index
+                            st_gen_index = n_index
                             gens += 1
                             img_list.append(g_img)
                             label_list.append(current_label)
 
                     elif act == 'flush_dataset':
-                        # import ipdb
-                        # ipdb.set_trace()
-                        index_list = np.array(index_list)
-                        img_list = np.array(img_list)
-                        label_list = np.array(label_list)
-
-                        dataset_one_use.prepare_dataset(index_list, img_list,
-                                                        label_list)
-                        dataset_one_use.show_current()
-
+                        flush_to_dataset(dataset_one_use, index_list, img_list,label_list, add_original,show_data=True)
                         index_list = []
                         img_list = []
                         label_list = []
 
                     elif act == 'do_backprop':
-
-                        if backprops == 0:
-                            eval_current_model('real', model, base_dataset,
-                                               current_ind, backprops, out_f,
-                                               model.current_log, selected_cam,
-                                               eval=True)
-                            eval_current_model('gen', model, dataset_one_use,
-                                               st_gen_index, backprops, out_f,
-                                               model.current_log, selected_cam)
-                        backprops += 1
-                        model.train(train_file_used=config_path,
-                                    save_model=False, eval=False)
-                        eval_current_model('real', model, base_dataset,
-                                           current_ind, backprops, out_f,
-                                           model.current_log, selected_cam,
-                                           eval=True)
-                        eval_current_model('gen', model, dataset_one_use,
-                                           st_gen_index, backprops, out_f,
-                                           model.current_log, selected_cam)
-
-                    pass
+                        backprops = do_backprop(model, base_dataset, dataset_one_use,current_ind, out_f, selected_cam,current_mask, use_selective_dropout,backprops, config_path)
                 except Exception as e:
                     import traceback
                     print(traceback.format_exc())

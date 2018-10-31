@@ -47,8 +47,19 @@ def get_slim_arch_bn(inputs,isTrainTensor,num_classes=1000,scope='vgg_16'):
 
             # Here we have 14x14 filters
             net = tf.reduce_mean(net, [1, 2])  # Global average pooling
+
+
+            # add layer with float 32 mask of same shape as global average pooling out
+            # feed default with ones, leave placeholder
+
+            mask = tf.placeholder_with_default(tf.ones_like(net),shape=net.shape,name='gap_mask')
+            net = tf.multiply(net,mask)
+
+
             net = layers_lib.fully_connected(net, num_classes, activation_fn=None, biases_initializer=None,
                                              scope='softmax_logits')
+
+
 
             # Convert end_points_collection into a end_point dict.
             end_points = utils.convert_collection_to_dict(end_points_collection)

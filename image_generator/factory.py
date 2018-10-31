@@ -1,11 +1,12 @@
-from image_generator.replace_with_crops import Replace_with_dataset_crops
+from image_generator.replace_with_crops import Replace_with_dataset_crops, \
+    insert_crop_random_image
 from image_generator.yu2018 import yu2018generative
 import json
 
 from select_tool.config_data import dataset_obj_dict
 
 
-availables = ['yu2018','random_crop']
+availables = ['yu2018','random_crop','random_insert']
 
 def get_generator_from_key(key,dataset=None):
 
@@ -15,6 +16,9 @@ def get_generator_from_key(key,dataset=None):
     elif key == availables[1]:
         assert(dataset is not None),"Trying to use random_crop generator without dataset parameter"
         return Replace_with_dataset_crops(dataset,3)
+    elif key == availables[2]:
+        assert(dataset is not None),"Trying to use insert_crop_random_image generator without dataset parameter"
+        return insert_crop_random_image(dataset,3)
 
     else:
         raise Exception("{0} not in available. Availables: {1}".format(key,availables))
