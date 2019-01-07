@@ -117,6 +117,8 @@ class Imagenet_Dataset(Dataset):
             with open(train_index_list_path,'rb') as f:
                 self.train_index_list = pickle.load(f)
 
+        self.train_index_list = list(map(lambda x : x.decode('utf8'),self.train_index_list)) #each string was a byte array
+
         def preprocess(index, x, y):
             return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, self.n_classes))
 
@@ -163,19 +165,17 @@ class Imagenet_Dataset(Dataset):
 
     def get_index_list(self):
         assert (hasattr(self, 'data_folder')), "Image folder undefined"
-        l = []
-        for folder in os.listdir(self.data_folder):
-            if os.path.isdir(os.path.join(self.data_folder, folder)):
-                for f_p in os.listdir(os.path.join(self.data_folder, folder)):
-                    ext = f_p.split('.')[-1].lower()
-                    if (ext == 'jpg') or (ext == 'jpeg'):
-                        l.append(f_p)
-        return l
+        return self.train_index_list
 
-    def get_train_image_at(self, index):  # index is image path
+    def get_train_image_at(self, index,strict=False):  # index is image path
         # example: n02423022_7746.JPEG
         # n02423022_original_images
         assert (hasattr(self, 'data_folder')), "Image folder undefined"
+        if not(index in self.train_index_list):
+            print("WARNING IMAGE NOT IN TRAIN LIST YOU ARE USING A TEST OR VALIDATION IMAGE")
+            if strict:
+                print("Strict mode returning NONE")
+                return None
         class_name = index.split('_')[0]
         full_path = os.path.join(self.data_folder, "{0}_original_images".format(class_name), index)
         img = cv2.imread(full_path)
@@ -195,4 +195,4 @@ class Imagenet_Dataset(Dataset):
 
 if __name__ == '__main__':
     with tf.Session().as_default() as sess:
-        t = Imagenet_Dataset(1, 10)
+        t = Imagenet_Dataset(1, 10,data_folder='./temp/imagenet_subset')

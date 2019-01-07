@@ -5,6 +5,8 @@ import numpy as np
 import datetime
 import pickle
 import cv2
+import json
+
 try:
     from line_profiler import LineProfiler
 
@@ -56,6 +58,46 @@ def strip_consts(graph_def, max_const_size=32):
             if size > max_const_size:
                 tensor.tensor_content = b"<stripped %d bytes>"%size
     return strip_def
+
+def parse_config_recur(config_path):
+
+    all_dicts ={}
+    with open(config_path,'r') as f:
+        data=json.load(f)
+
+    all_dicts = {**all_dicts,**data}
+
+    t_params = data['train_params']
+    gen_file = t_params['gen_file']
+
+    with open(gen_file) as f:
+        data_gen=json.load(f)
+
+    all_dicts = {**all_dicts, **data_gen}
+
+    used_select = data_gen['used_select']
+    with open(used_select) as f:
+        data_select=json.load(f)
+
+    all_dicts = {**all_dicts, **data_select}
+
+
+    train_result_path = data_select['train_result_path']
+    with open(train_result_path,'r') as f:
+        data_t_r = json.load(f)
+        path_train_file = data_t_r["train_file_used"]
+
+    with open(path_train_file,'r') as f2:
+        data_train_file = json.load(f2)
+
+
+    all_dicts['model_load_path_train_result'] = data_t_r['model_load_path']
+    all_dicts['model_load_path_at_train_file'] = data['model_load_path']
+
+    all_dicts = {**all_dicts, **data_train_file}
+
+    return all_dicts
+
 
 def save_graph_txt(graph):
     with open('graphpb.txt', 'w') as f:
