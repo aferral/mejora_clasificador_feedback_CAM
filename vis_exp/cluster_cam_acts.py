@@ -65,9 +65,11 @@ if not load_file_path:
                 # extract activations in batch, CAM
                 act_layer,cam_batch,index_batch,soft_max_out,targets = model.sess.run([layer_name,model.cam_out,model.indexs,model.pred,model.targets],feed_dict=fd)
 
+
+                miss_class = (soft_max_out.argmax(axis=1) != targets.argmax(axis=1))
+
                 # filter
-                selection = np.bitwise_and((soft_max_out.argmax(axis=1) != targets.argmax(axis=1)),  (targets.argmax(axis=1)) == class_to_use)# only missclasified
-                selection = selection
+                selection = np.bitwise_and(miss_class,  (targets.argmax(axis=1)) == class_to_use)# only missclasified
 
                 act_layer = act_layer[selection]
                 cam_batch = cam_batch[selection]
@@ -76,7 +78,17 @@ if not load_file_path:
 
 
                 cam_batch = tf.squeeze(cam_batch, axis=[3, 4])
-                cam_batch = cam_batch[:,:,:,label_to_use].eval()
+
+                use_pred_max = True
+
+                if use_pred_max:
+                    pred_indexs = soft_max_out.argmax(axis=1)
+                    cam_all = cam_batch.eval()
+                    sel = [cam_all[i,:,:,pred_indexs[i]] for i in range(len(pred_indexs)) ]
+                    cam_batch = np.array(sel)
+
+                else:
+                    cam_batch = cam_batch[:,:,:,label_to_use].eval()
 
                 all_acts.append(act_layer.mean(axis=(0,1,2)))
 
