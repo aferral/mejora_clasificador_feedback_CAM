@@ -146,11 +146,26 @@ class imagenet_classifier_cam_loss(Abstract_model):
 
             masked_cam = tf.multiply(selected_cam, cam_mask, name='masked_cam')
 
-            cam_loss = tf.multiply(tf.reduce_sum(masked_cam), loss_lambda,
+            cam_loss = tf.multiply(tf.reduce_mean(masked_cam), loss_lambda,
                                    name='loss_cam_v')
 
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,
-                                                    predictions) + cam_loss
+
+
+        """
+        old loss  
+        cam_loss = tf.multiply(tf.reduce_sum(masked_cam), loss_lambda,name='loss_cam_v')
+        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
+        
+        # loss lambda ce 
+        cam_loss = tf.multiply(tf.reduce_mean(masked_cam), loss_lambda,name='loss_cam_v')
+        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
+        
+        loss 3 
+        cam_loss = tf.reduce_mean(masked_cam)
+        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
+        """
+
+        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
         # self.loss = cam_loss
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -162,3 +177,13 @@ class imagenet_classifier_cam_loss(Abstract_model):
         prediction = tf.argmax(predictions, 1)
         equality = tf.equal(prediction, tf.argmax(self.targets, 1))
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
+
+
+
+if __name__ == "__main__":
+    from datasets.quickdraw_dataset import  QuickDraw_Dataset
+    with tf.Session().as_default() as sess:
+        t = QuickDraw_Dataset(1, 60,data_folder='./temp/quickdraw_expanded_images')
+
+        with imagenet_classifier_cam_loss(t, debug=False) as model:
+            model.train()

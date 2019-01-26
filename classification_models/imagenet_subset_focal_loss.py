@@ -52,10 +52,10 @@ class imagenet_classifier_focal_loss(imagenet_classifier_cam_loss):
         gamma = 2
         lbda = 0.25
 
-        gamma_fl = tf.placeholder_with_default(2, (),name='gamma_fl')
+        gamma_fl = tf.placeholder_with_default(2.0, (),name='gamma_fl')
         lbda_fl = tf.placeholder_with_default(0.25, (), name='lbda_fl')
 
-        pond = tf.reduce_sum( lbda_fl * (1-self.pred) ** (gamma_fl) * self.targets, axis=1)
+        pond = tf.reduce_sum( lbda_fl * (1-self.pred) ** (gamma_fl) * tf.cast(self.targets,tf.float32), axis=1)
         ce_row = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.targets, logits=predictions)
         self.loss = tf.reduce_sum(pond * ce_row)
 

@@ -6,8 +6,8 @@ from sklearn.cluster import MiniBatchKMeans
 
 from vis_exp.vis_bokeh import plotBlokeh
 
-repr_file = 'representations_2019-Jan-03--23:37.pkl' #'representations_2018-Dec-11--22:57_all_cm0.pkl'
-load_file_path = 'dataset_acts_2019-Jan-03--23:37.pkl' #'dataset_acts_2018-Dec-11--22:39.pkl'
+repr_file = 'representations_2019-Jan-08--12:04.pkl' #'representations_2018-Dec-11--22:57_all_cm0.pkl'
+load_file_path = 'dataset_acts_2019-Jan-08--12:04.pkl' #'dataset_acts_2018-Dec-11--22:39.pkl'
 
 filter_this_name= None #'n02114548'
 # select to export mask

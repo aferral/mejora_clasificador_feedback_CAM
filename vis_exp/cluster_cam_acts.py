@@ -13,15 +13,37 @@ import pickle
 from datetime import datetime
 from vis_exp.vis_bokeh import plotBlokeh
 
-config_file = './config_files/train_files/gen_imagenet_subset_09_oct_074.json'
-layer_name = 'vgg_16/conv5/conv5_3/Relu:0'
-label_to_use = 3
-class_to_use = 3
-load_file_path = None #'dataset_acts_2018-Dec-11--22:39.pkl'#'dataset_acts_2018-Dec-11--21:06.pkl'#"dataset_acts_2018-Dec-11--19:50.pkl" #'dataset_acts_2018-Dec-11--18:39.pkl'
-filter_this_name= None #'n02114548'
+
+import argparse
+
+argparser =argparse.ArgumentParser()
+argparser.add_argument('config_file',help='Train file used ')
+argparser.add_argument('layer_name',help='Train file used ')
+argparser.add_argument('--cam_label_to_use',help='If not use_pred_max use only this cam class')
+argparser.add_argument('--class_to_use',help='Train file used ')
+argparser.add_argument('--filter_this_name',help='Train file used ')
+argparser.add_argument('--use_pred_max', action='store_true',help='Use cam of max pred')
+argparser.add_argument('--activations_file_path',help='Use cam of max pred')
+argparser.add_argument('--just_reload_act_file',action='store_true', help='Avoid re calc of activations')
+argparser.add_argument('--out_path_dim_red')
 
 
-if not load_file_path:
+args = argparser.parse_args()
+
+
+config_file = args.config_file
+layer_name = args.layer_name
+cam_label_to_use = args.cam_label_to_use
+class_to_use = args.class_to_use
+filter_this_name= args.filter_this_name
+use_pred_max = args.use_pred_max
+
+activations_file_path = args.activations_file_path
+just_reload_act_file = args.just_reload_act_file
+out_path_dim_red = args.out_path_dim_red
+
+
+if not just_reload_act_file :
     data_config = parse_config_recur(config_file)
     t_params = data_config['train_params']
     m_k = data_config['model_key']
@@ -57,9 +79,9 @@ if not load_file_path:
         component_mask = {}
         component_mean_v = {}
         all_acts = []
+
         while True:
             try:
-
                 fd = model.prepare_feed(is_train=False, debug=False)
 
                 # extract activations in batch, CAM
@@ -68,8 +90,13 @@ if not load_file_path:
 
                 miss_class = (soft_max_out.argmax(axis=1) != targets.argmax(axis=1))
 
+
+
                 # filter
-                selection = np.bitwise_and(miss_class,  (targets.argmax(axis=1)) == class_to_use)# only missclasified
+                if use_pred_max:
+                    selection = miss_class
+                else:
+                    selection = np.bitwise_and(miss_class,  (targets.argmax(axis=1)) == class_to_use)# only missclasified
 
                 act_layer = act_layer[selection]
                 cam_batch = cam_batch[selection]
@@ -79,16 +106,16 @@ if not load_file_path:
 
                 cam_batch = tf.squeeze(cam_batch, axis=[3, 4])
 
-                use_pred_max = True
+
 
                 if use_pred_max:
-                    pred_indexs = soft_max_out.argmax(axis=1)
+                    pred_indexs = soft_max_out.argmax(axis=1)[selection]
                     cam_all = cam_batch.eval()
                     sel = [cam_all[i,:,:,pred_indexs[i]] for i in range(len(pred_indexs)) ]
                     cam_batch = np.array(sel)
 
                 else:
-                    cam_batch = cam_batch[:,:,:,label_to_use].eval()
+                    cam_batch = cam_batch[:,:,:, cam_label_to_use].eval()
 
                 all_acts.append(act_layer.mean(axis=(0,1,2)))
 
@@ -142,6 +169,10 @@ if not load_file_path:
 
     now = datetime.now()
     now_string = now.strftime('%Y-%b-%d--%H:%M')
+    out_path_acts = "dataset_acts_{0}.pkl".format(now_string) if (activations_file_path is None) else activations_file_path
+    print('Activations saved to {0}'.format(out_path_acts))
+
+
     # save component_mean_v, component_mask, mean_per_filter
     with open("dataset_acts_{0}.pkl".format(now_string),'wb') as f:
         out={'comp_mask' : component_mask, 'comp_mean' : component_mean_v,'mean_p_f' : mean_per_filt }
@@ -150,7 +181,8 @@ if not load_file_path:
 else:
 
     # Open mean_vectors dataset
-    with open(load_file_path,'rb') as f:
+    print("Loading acts from {0}".format(activations_file_path))
+    with open(activations_file_path,'rb') as f:
         out=pickle.load(f)
     component_mask=out['comp_mask']
     component_mean_v=out['comp_mean']
@@ -200,7 +232,7 @@ reduced_d_data_umap = umap.UMAP().fit_transform(all_data_x)
 now = datetime.now()
 now_string = now.strftime('%Y-%b-%d--%H:%M')
 representation_names = 'representations_{0}'.format(now_string)
-out_name = "{0}.pkl".format(representation_names)
+out_name = "{0}.pkl".format(representation_names) if out_path_dim_red is None else out_path_dim_red
 with open(out_name, 'wb') as f:
     out = {'pca2': reduced_d_data_pca,
            'tsne': reduced_d_data_tsne,

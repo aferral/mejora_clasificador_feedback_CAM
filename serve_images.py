@@ -13,7 +13,7 @@ import pickle
 
 import numpy as np
 
-mask_image_file = "dataset_acts_2018-Dec-11--22:39.pkl"
+mask_image_file = "dataset_acts_2019-Jan-08--12:04.pkl"
 
 PORT = 8000
 
@@ -87,5 +87,6 @@ try:
     httpd.serve_forever()
 except Exception:
     httpd.shutdown()
-
+finally:
+    httpd.shutdown()
 

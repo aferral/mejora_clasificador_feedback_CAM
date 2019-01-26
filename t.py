@@ -19,7 +19,8 @@ from image_generator.yu2018 import yu2018generative
 from select_tool.config_data import model_obj_dict, dataset_obj_dict
 from select_tool.img_selector import call_one_use_select
 
-from utils import show_graph, now_string, timeit, load_mask, imshow_util, get_img_cam_index, get_img_RAW_cam_index
+from utils import show_graph, now_string, timeit, load_mask, imshow_util, \
+    get_img_cam_index, get_img_RAW_cam_index, get_img_RAW_cam_index_batch
 import json
 import random
 
@@ -112,7 +113,7 @@ import matplotlib.pyplot as plt
 
 
 def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
-                       out_f, current_log, eval=False):
+                       out_f, current_log, eval=False, save_img=False):
     os.makedirs(out_f, exist_ok=True)
     path_out_cams = os.path.join(out_f, 'raw_cams')
     os.makedirs(path_out_cams, exist_ok=True)
@@ -131,37 +132,62 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
             f.write("Backpropagation: {0} test: {1}".format(ind_backprop,
                                                             out_string))
 
-    for index_key in index_list:
+
+    aimgs, acams, apred, alabels, a_r_cams = get_img_RAW_cam_index_batch(
+        dataset, classifier, index_list, batch_size=100)
+
+    for ind  in range(len(index_list)):
+        index_key = index_list[ind]
+        img = aimgs[ind]
+        all_cams = acams[ind].transpose((2,0,1))
+        scores = apred[ind]
+        r_label = alabels[ind][0]
+        raw_cams = a_r_cams[ind]
+
+
         name_cam_raw = name + "_" + index_key
 
         # save raw cam
-        img, all_cams, scores, r_label, raw_cams = get_img_RAW_cam_index(
-            dataset, classifier, index_key)
-        print(scores)
-        np.save(os.path.join(path_out_cams,
-                             '{1}_raw_vis_it_{0}.npy'.format(ind_backprop,
-                                                             name_cam_raw)),
-                raw_cams)
+        # img, all_cams, scores, r_label, raw_cams = get_img_RAW_cam_index(
+        #     dataset, classifier, index_key)
+
+
+
+        np.save(os.path.join(path_out_cams,'{1}_raw_vis_it_{0}.npy'.format(ind_backprop,name_cam_raw)),raw_cams.transpose((2,0,1)))
+        # save original image
+        if save_img:
+            if (len(img.shape) == 3) and img.shape[2] == 3:
+                cv2.imwrite(os.path.join(out_f,'{0}_original.png'.format(name_cam_raw)),cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+            else:
+                cv2.imwrite(os.path.join(out_f, '{0}_original.png'.format(
+                    name_cam_raw)), img)
+
+
 
         # plot all CAM for index
-        plt.clf()
-        f, axs = plt.subplots(1, len(all_cams))
+        temp_cams_out = []
         for ind in range(len(all_cams)):
             # transform to RGB for matplotlib
-            img_colored = cv2.cvtColor(
-                cv2.applyColorMap(all_cams[ind], cv2.COLORMAP_JET),
-                cv2.COLOR_BGR2RGB)
-            l = r_label
+            img_colored = cv2.applyColorMap(all_cams[ind], cv2.COLORMAP_JET)
+
             scor = "{0:.2f}".format(scores[ind])
-            axs[ind].set_title('R_l {0} Cls {1} -- {2}'.format(l, ind, scor),
-                               fontdict={'fontsize': 11})
-            axs[ind].imshow(img_colored)
-        plt.savefig(os.path.join(out_f,
-                                 '{2}__{1}__it_{0}.png'.format(ind_backprop,
-                                                               name,
-                                                               name_cam_raw)),
-                    bbox_inches='tight', pad_inches=0)
-        plt.close('all')
+            title = 'r:{0} c:{1} sc:{2}'.format(r_label, ind, scor)
+
+            cv2.putText(img_colored, title,
+                        (0, int(img_colored.shape[1]*0.9)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (255, 255, 255),
+                        2)
+            sep = np.zeros((img_colored.shape[0],30,img_colored.shape[2]))
+            temp_cams_out.append(img_colored)
+            temp_cams_out.append(sep)
+
+        out_cam_img = np.concatenate(temp_cams_out,axis=1)
+        out_cam_path = '{2}__{1}__it_{0}.png'.format(ind_backprop,name,name_cam_raw)
+        cv2.imwrite(os.path.join(out_f,out_cam_path),out_cam_img)
+
+
 
 
 # accion: seleccionar mascara desde (img,img_cam) -> mask
@@ -241,7 +267,7 @@ def do_backprop(model, base_dataset, dataset_one_use, base_index_list,
     current_backprop += 1
 
     if mask_dict and change_feed_dict:
-        print("Using selective dropout")
+        print("Using special feed_dict")
         original_fun = model.prepare_feed
 
         # base_index_list,lista_indices_gen
@@ -434,11 +460,21 @@ def do_train_config(config_path):
 
         batch_size = t_params['b_size'] if 'b_size' in t_params else 20
         epochs = t_params['epochs'] if 'epochs' in t_params else 1
-        epochs = 1 # todo test code
 
         model_class = model_obj_dict[model_key]
         dataset_class = dataset_obj_dict[dataset_key]
         base_dataset = dataset_class(epochs,batch_size,**dataset_params)
+
+        if ('just_eval' in t_params) and (t_params['just_eval']):
+            print("Doing eval for validation set")
+            with model_class(base_dataset, **model_params) as model:
+                if model_load_path:
+                    model.load(model_load_path)
+
+                model.eval(mode='test')
+                model.eval(mode='val')
+            return
+
         train_for_epochs(base_dataset,model_class,model_params,model_load_path,config_path)
 
     elif t_mode == "gen_train":
@@ -650,12 +686,14 @@ def do_train_config(config_path):
                                 current_mask,n_random=20,gen_imgs=0)
 
                             # flush
-                            flush_to_dataset(dataset_one_use, index_list,img_list, label_list, add_original,current_ind,current_img,current_label)
+                            flush_to_dataset(dataset_one_use, index_list,img_list, label_list, False,current_ind,current_img,current_label)
 
                             # do backpropagation
+                            index_list_t = [] if current_ind is None else [current_ind]
+
                             backprops = do_backprop(model, base_dataset,
                                                     dataset_one_use,
-                                                    [current_ind], [],
+                                                    index_list_t, [],
                                                     out_f, {}, backprops, config_path,
                                                     change_feed_dict=False)
 
@@ -745,6 +783,7 @@ def do_train_config(config_path):
                     import traceback
                     print(traceback.format_exc())
                     print("Exception try again")
+                    raise e
 
 
 

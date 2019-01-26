@@ -135,6 +135,18 @@ class Abstract_model(ExitStack):
         assert (not (self.pred is None)), 'Must define pred. Softmax prediction layer'
 
 
+    def save_model(self,saver,out_path=None):
+        if out_path :
+            saver.save(self.sess, os.path.join(out_path, 'model'))
+            return out_path
+        else:
+            now = now_string()
+            path_model_checkpoint = os.path.join('model', self.save_folder, now)
+            print("Saving model at {0}".format(path_model_checkpoint))
+            os.makedirs(path_model_checkpoint, exist_ok=True)
+            saver.save(self.sess,os.path.join(path_model_checkpoint, 'saved_model'))
+        return path_model_checkpoint
+
     #@do_profile()
     def train(self,train_file_used=None,save_model=True,eval=True):
 
@@ -154,7 +166,7 @@ class Abstract_model(ExitStack):
                         l, _, acc,tgts = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets], fd)
 
 
-                        if i % 20 == 0:
+                        if i % 100 == 0:
                             from collections import Counter
                             log ="It: {}, loss_batch: {:.3f}, batch_accuracy: {:.2f}%".format(i, l, acc * 100)
                             self.current_log += '{0} \n'.format(log)
@@ -175,11 +187,8 @@ class Abstract_model(ExitStack):
                     out_string = self.eval()
         # Save model
         if save_model:
-            now = now_string()
-            path_model_checkpoint = os.path.join('model',self.save_folder,now)
-            print("Saving model at {0}".format(path_model_checkpoint))
-            os.makedirs(path_model_checkpoint,exist_ok=True)
-            saver.save(self.sess, os.path.join(path_model_checkpoint,'saved_model'))
+
+            path_model_checkpoint = self.save_model(saver)
 
             # save accuracy in val set
             if eval:
@@ -296,7 +305,7 @@ class Abstract_model(ExitStack):
                 temp = (temp - temp.min()) / (temp.max() - temp.min())
             out_maps_per_class[i] = temp
 
-        return img_proc,pred[0],(out_maps_per_class)
+        return img_proc,pred[0],out_maps_per_class
 
 
 class digits_clasifier(Abstract_model):

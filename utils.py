@@ -197,3 +197,59 @@ def get_img_RAW_cam_index(dataset,classifier,index):
         all_cams.append(t)
 
     return (img * 255).astype(np.uint8),all_cams,prediction,r_label,cmaps
+
+def get_img_RAW_cam_index_batch(dataset,classifier,index_list,batch_size=100):
+
+    c = 0
+
+    all_imgs = []
+    all_cams = []
+    all_preds = []
+    all_labels = []
+    all_raw_cams = []
+
+
+    while c < len(index_list):
+        b_index = index_list[c:c+batch_size]
+
+        tuples_img_labels = [dataset.get_train_image_at(index) for index in b_index]
+
+        b_imgs_raw = np.concatenate(list(map(lambda x : x[0],tuples_img_labels)),axis=0)
+        b_r_labels = list(map(lambda x : x[1],tuples_img_labels))
+
+        imgs_out = np.concatenate([ np.expand_dims( imshow_util(img_r.reshape(dataset.vis_shape()),dataset.get_data_range()),axis=0) for img_r in b_imgs_raw], axis=0 )
+        imgs_out = (imgs_out * 255).astype(np.uint8)
+
+        imgs_shape = (dataset.vis_shape()[0],dataset.vis_shape()[1])
+
+
+        img_proc, conv_acts, softmax_w, pred = classifier.feed_forward_vis(b_imgs_raw)
+
+        # Ponderate each last_conv acording to softmax weight and sum channels
+        n_c = softmax_w.shape[1]
+        b_n = conv_acts.shape[0]
+        cams_arr = conv_acts.dot(softmax_w)
+
+        tm = cams_arr.min(axis=(1, 2)).reshape(b_n, 1, 1, n_c)
+        tmax = cams_arr.max(axis=(1, 2)).reshape(b_n, 1, 1, n_c)
+        norm_cam = (cams_arr - tm) / (tmax - tm)
+        cam_to_resize = (norm_cam * 255).astype(np.uint8)
+
+        cam_out = np.concatenate([np.expand_dims(cv2.resize(c, imgs_shape), axis=0) for c in cam_to_resize] , axis=0)
+
+        c += batch_size
+
+        all_imgs.append(imgs_out)
+        all_cams.append(cam_out)
+        all_preds.append(pred)
+        all_labels.append(b_r_labels)
+        all_raw_cams.append(cams_arr)
+
+    if len(index_list) > 0:
+        all_imgs = np.concatenate(all_imgs,axis=0)
+        all_cams = np.concatenate(all_cams,axis=0)
+        all_preds = np.concatenate(all_preds,axis=0)
+        all_labels = np.concatenate(all_labels,axis=0)
+        all_raw_cams = np.concatenate(all_raw_cams,axis=0)
+
+    return all_imgs,all_cams,all_preds, all_labels, all_raw_cams
