@@ -172,7 +172,7 @@ class Imagenet_Dataset(Dataset):
         # n02423022_original_images
         assert (hasattr(self, 'data_folder')), "Image folder undefined"
         if not(index in self.train_index_list):
-            print("WARNING IMAGE NOT IN TRAIN LIST YOU ARE USING A TEST OR VALIDATION IMAGE")
+            print("WARNING IMAGE NOT IN TRAIN LIST YOU ARE USING A TEST OR VALIDATION IMAGE {0}".format(index))
             if strict:
                 print("Strict mode returning NONE")
                 return None

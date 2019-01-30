@@ -187,7 +187,7 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
         out_cam_path = '{2}__{1}__it_{0}.png'.format(ind_backprop,name,name_cam_raw)
         cv2.imwrite(os.path.join(out_f,out_cam_path),out_cam_img)
 
-
+    return
 
 
 # accion: seleccionar mascara desde (img,img_cam) -> mask
@@ -346,6 +346,40 @@ def generate_random_for_loop(base_dataset, current_ind, current_img,
             temp_index_list.append(n_index)
             temp_img_list.append(g_img)
             temp_label_list.append(current_label)
+
+    print("Summary of added images: random {0} inverse {1} total {2}".format(
+        n_random, gen_imgs, len(temp_label_list)))
+    return temp_index_list, temp_img_list, temp_label_list, n_gens
+
+def generate_random_from_list(base_dataset, index_list, gens, n_random=5,gen_imgs=2):
+    temp_index_list = []
+    temp_img_list = []
+    temp_label_list = []
+    n_gens = gens
+
+    # add random images to dataset
+    ind_list = base_dataset.get_index_list()  # type: List
+
+    for i in range(n_random):
+        random_index = random.choice(ind_list)
+        n_index = "gen_id__{0}__bindex__{1}".format(random_index, n_gens)
+        # print("Adding {0}".format(n_index))
+        random_img, random_label = base_dataset.get_train_image_at(random_index)
+        n_gens += 1
+        temp_index_list.append(n_index)
+        temp_img_list.append(random_img[0])
+        temp_label_list.append(random_label)
+
+    for i in range(gen_imgs):
+        random_index = random.choice(index_list)
+        n_index = "gen_id__{0}__bindex__{1}".format(random_index, n_gens)
+        # print("Adding {0}".format(n_index))
+        random_img, random_label = base_dataset.get_train_image_at(random_index)
+        n_gens += 1
+        temp_index_list.append(n_index)
+        temp_img_list.append(random_img[0])
+        temp_label_list.append(random_label)
+
 
     print("Summary of added images: random {0} inverse {1} total {2}".format(
         n_random, gen_imgs, len(temp_label_list)))

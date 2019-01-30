@@ -111,6 +111,8 @@ class index_select(Frame):
     def __init__(self,controller,current_model,master,*args,**kwargs):
         self.controller = controller
         self.current_model = current_model
+        self.filtered_list = None
+        self.saved_selection = None
 
         from tkinter import EXTENDED,Scrollbar,Y
 
@@ -137,12 +139,13 @@ class index_select(Frame):
 
         f=Frame(self)
         Label(f,text="Filtro: ").pack(side=LEFT)
-        Entry(f).pack(side=LEFT)
+        self.entry_w = Entry(f)
+        self.entry_w.pack(side=LEFT)
         f.pack()
 
         f2=Frame(self)
-        Button(f2, text='Filter').pack(side=LEFT)
-        Button(f2,text='Clean Filter').pack(side=LEFT)
+        Button(f2, text='Filter',command=self.filter_indexs).pack(side=LEFT)
+        Button(f2,text='Clean Filter',command=self.clean_filter).pack(side=LEFT)
         Button(f2, text='Export sel for gen',command=self.export_selection).pack(side=LEFT)
         f2.pack()
 
@@ -155,6 +158,29 @@ class index_select(Frame):
         self.listbox.select_set(0)
         self.listbox.event_generate("<<ListboxSelect>>")
         self.listbox.bind('<<ListboxSelect>>', self.selection)
+
+    def filter_indexs(self):
+        import random
+        path_filter = self.entry_w.get()
+        with open(path_filter,'r') as f:
+            indexs_list_str = f.read().strip()
+        random.seed(3)
+        indexs_list = list(set(indexs_list_str.split('\n')))
+        print(len(indexs_list))
+        random.shuffle(indexs_list)
+
+        self.filtered_list = indexs_list
+        self.listbox.delete(0, END)
+        for item in indexs_list:
+            self.listbox.insert(END, item)
+
+    def clean_filter(self):
+        self.filtered_list = None
+        self.update_model(self.current_model)
+        self.listbox.delete(0, END)
+        for item in sorted(self.index_list):
+            self.listbox.insert(END, item)
+        self.saved_selection = None
 
     def export_selection(self):
         sel_files_folder = os.path.join('config_files','select_files')
@@ -180,10 +206,16 @@ class index_select(Frame):
         self.current_index = self.model.get_current_index()
         self.mask_list = self.model.get_current_mask_index_list()
 
+        indexs_list = self.filtered_list if self.filtered_list else sorted(self.index_list)
 
         self.listbox.delete(0, END)
-        for item in sorted(self.index_list):
+        for item in indexs_list:
             self.listbox.insert(END, item)
+
+        if self.saved_selection:
+            ind,ypos = self.saved_selection
+            self.listbox.selection_set(ind)
+            self.listbox.yview_moveto(ypos[0])  # go back to that position
 
     def next_prev(self,x):
         def selection():
@@ -206,6 +238,8 @@ class index_select(Frame):
         selected_index = value
         self.current_index = selected_index
         self.controller.event_change_index(selected_index)
+        self.saved_selection = (index,self.listbox.yview())
+
         pass
 
 
@@ -331,14 +365,26 @@ class controller:
         pass
 
 # Load tuples (dataset, model) in config file
+if __name__ == '__main__':
+    import argparse
+    argparser=argparse.ArgumentParser()
+    argparser.add_argument('--t_result_file',help='What train result to use')
+    args = argparser.parse_args()
 
-config_list = get_config_file_list()
-print(config_list)
-f_path = os.path.join(config_folder,config_list[9])
-print("Using: {0}".format(f_path))
+    config_list = get_config_file_list()
 
-with model_manager_obj(f_path) as model_manager:
-    central = controller(model_manager,config_list)
+    if args.t_result_file:
+        f_path = args.t_result_file
+    else:
+        print(config_list)
+        f_path = os.path.join(config_folder, config_list[9])
+
+    print("Using: {0}".format(f_path))
+    with model_manager_obj(f_path) as model_manager:
+        central = controller(model_manager, config_list)
+
+    pass
+
 
 
 
