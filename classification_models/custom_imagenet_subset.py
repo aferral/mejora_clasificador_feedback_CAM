@@ -102,12 +102,8 @@ class imagenet_classifier(Abstract_model):
 
 
 if __name__ == '__main__':
-    dataset = Imagenet_Dataset(2,40)
+    dataset = Imagenet_Dataset(20,60,add_data_augmentation=True)
 
 
     with imagenet_classifier(dataset, debug=False) as model:
-        show_graph(tf.get_default_graph())
-        save_graph_txt(tf.get_default_graph())
-        graph = tf.get_default_graph()
-        writer = tf.summary.FileWriter(logdir='logdir', graph=graph)
-        writer.flush()
+        model.train()

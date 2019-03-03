@@ -98,7 +98,7 @@ def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
             return net, end_points
 
 
-class imagenet_classifier_cam_loss(Abstract_model):
+class imagenet_classifier_CONV_LOSS(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False,
                  name='imagenet_classifier'):
@@ -128,50 +128,22 @@ class imagenet_classifier_cam_loss(Abstract_model):
         self.cam_out = self.graph.get_tensor_by_name('vgg_16/raw_CAM/cam_out:0')
 
         with tf.variable_scope("cam_loss_term"):
-            sq_cam = tf.squeeze(self.cam_out, axis=[3, 4])  # N x hl x wl x C
-
-            # selecciono solamente CAM del target N x hl x wl x 1
-            sel_index = tf.cast(tf.argmax(self.targets, axis=1), tf.int32)
-            sel_index = tf.stack([tf.range(tf.shape(sq_cam)[0]), sel_index],
-                                 axis=1, name='selected_index')
-
-            # esto es algo complejo pero lo unico que hace es seleccionar por canal el del indice
-            selected_cam = tf.gather_nd(tf.transpose(sq_cam, perm=[0, 3, 1, 2]),
-                                        sel_index, name='selected_cam')
 
             # nuevo termino de loss = CAM[label](upsample)[mask].sum() * ponderador
             # placeholders
-            cam_mask = tf.placeholder_with_default(tf.zeros_like(selected_cam),
-                                                   selected_cam.shape,
+            shape_mask = self.last_conv.shape[0:3]
+            cam_mask = tf.placeholder_with_default(tf.zeros_like(self.last_conv[:,:,:,0]),
+                                                   shape_mask,
                                                    name='cam_mask')
             self.loss_lambda = tf.placeholder_with_default(0.0, (),
                                                       name='loss_lambda')
 
-            # reduce to initial*0.2 after 200 steps
-            self.lambda_with_decay = tf.train.exponential_decay(self.loss_lambda,
-                                                                self.global_step, 200,
-                                                           0.1)
 
-            masked_cam = tf.multiply(selected_cam, cam_mask, name='masked_cam')
+            masked_cam = tf.multiply(self.last_conv,tf.expand_dims(tf.cast(cam_mask, dtype=tf.float32), -1),name='masked_cam')
 
-            cam_loss = tf.multiply(tf.abs(tf.reduce_sum(masked_cam)), self.lambda_with_decay,
+
+            cam_loss = tf.multiply(tf.abs(tf.reduce_sum(masked_cam)), self.loss_lambda,
                                    name='loss_cam_v')
-
-        """
-        old loss  
-        cam_loss = tf.multiply(tf.reduce_sum(masked_cam), loss_lambda,name='loss_cam_v')
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
-        
-        # loss lambda ce 
-        cam_loss = tf.multiply(tf.reduce_mean(masked_cam), loss_lambda,name='loss_cam_v')
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
-        
-        loss 3 
-        cam_loss = tf.reduce_mean(masked_cam)
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
-        
-        loss 4 use old loss buy with lambda with exponential decay 
-        """
 
         self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
 
@@ -194,5 +166,5 @@ if __name__ == "__main__":
     with tf.Session().as_default() as sess:
         t = QuickDraw_Dataset(1, 60,data_folder='./temp/quickdraw_expanded_images')
 
-        with imagenet_classifier_cam_loss(t, debug=False) as model:
+        with imagenet_classifier_CONV_LOSS(t, debug=False) as model:
             model.train()

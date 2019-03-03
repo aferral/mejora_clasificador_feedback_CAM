@@ -8,6 +8,8 @@ from tf_records_parser.cifar10 import LOCAL_FOLDER
 import numpy as np
 import json
 
+from utils import data_augmentation
+
 IMAGE_SHAPE = [224, 224, 3]
 
 
@@ -53,7 +55,7 @@ def list_records():
 
 class Imagenet_Dataset(Dataset):
 
-    def __init__(self, epochs, batch_size, data_folder=None, **kwargs):
+    def __init__(self, epochs, batch_size, data_folder=None,use_all_in_train=False,add_data_augmentation=False, **kwargs):
         tfrecords = list_records()
         n_records = len(tfrecords)
         self.n_classes = get_n_classes()
@@ -75,9 +77,12 @@ class Imagenet_Dataset(Dataset):
         test_n_records = n_records - train_n_records - val_n_records
         assert (train_n_records != 0 and val_n_records != 0 and test_n_records != 0)
 
-        assert (train_n_records + val_n_records + test_n_records == n_records), "The train-val-test split must use all tf records."
+        if use_all_in_train:
+            train_records = tfrecords
+        else:
+            assert (train_n_records + val_n_records + test_n_records == n_records), "The train-val-test split must use all tf records."
+            train_records = tfrecords[0:train_n_records]
 
-        train_records = tfrecords[0:train_n_records]
         validation_records = tfrecords[train_n_records:train_n_records + val_n_records]
         test_records = tfrecords[train_n_records + val_n_records:]
 
@@ -119,14 +124,20 @@ class Imagenet_Dataset(Dataset):
 
         self.train_index_list = list(map(lambda x : x.decode('utf8'),self.train_index_list)) #each string was a byte array
 
-        def preprocess(index, x, y):
-            return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, self.n_classes))
+        if add_data_augmentation:
+            print('Using DATA AUGMENTATION')
+            def preprocess(index, x, y):
+                return (index, data_augmentation(tf.add(x, -self.mean) / 255,224), tf.one_hot(y, self.n_classes))
+        else:
+            def preprocess(index, x, y):
+                return (index, tf.add(x, -self.mean) / 255, tf.one_hot(y, self.n_classes))
 
         # .apply(tf.contrib.data.map_and_batch( map_func=preprocess, batch_size=batch_size))
         # .cache()
         # .map(preprocess,num_parallel_calls=4).batch(batch_size)
         # .prefetch(1)
         # .shuffle(10)
+
 
         # preprocesss
         shuffle_buffer = int(self.n_classes*1000*0.8)

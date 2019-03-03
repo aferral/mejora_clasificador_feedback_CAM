@@ -6,6 +6,11 @@ import datetime
 import pickle
 import cv2
 import json
+import tensorflow as tf
+
+import numpy as np
+import matplotlib.pyplot as plt
+
 
 try:
     from line_profiler import LineProfiler
@@ -59,37 +64,97 @@ def strip_consts(graph_def, max_const_size=32):
                 tensor.tensor_content = b"<stripped %d bytes>"%size
     return strip_def
 
+def data_augmentation(images_tensor : tf.Tensor,size) -> tf.Tensor:
+    # from https://www.wouterbulten.nl/blog/tech/data-augmentation-using-tensorflow-data-dataset/
+    def flip(x: tf.Tensor) -> tf.Tensor:
+        x = tf.image.random_flip_left_right(x)
+        x = tf.image.random_flip_up_down(x)
+        return x
+
+    def color(x: tf.Tensor) -> tf.Tensor:
+        x = tf.image.random_hue(x, 0.08)
+        x = tf.image.random_saturation(x, 0.6, 1.6)
+        x = tf.image.random_brightness(x, 0.05)
+        x = tf.image.random_contrast(x, 0.7, 1.3)
+        return x
+
+    def rotate(x: tf.Tensor) -> tf.Tensor:
+        return tf.image.rot90(x, tf.random_uniform(shape=[], minval=0, maxval=4,
+                                                   dtype=tf.int32))
+
+    def zoom(x: tf.Tensor) -> tf.Tensor:
+        # Generate 20 crop settings, ranging from a 1% to 20% crop.
+        scales = list(np.arange(0.8, 1.0, 0.01))
+        boxes = np.zeros((len(scales), 4))
+        for i, scale in enumerate(scales):
+            x1 = y1 = 0.5 - (0.5 * scale)
+            x2 = y2 = 0.5 + (0.5 * scale)
+            boxes[i] = [x1, y1, x2, y2]
+
+        def random_crop(img):
+            # Create different crops for an image
+            crops = tf.image.crop_and_resize([img], boxes=boxes,
+                                             box_ind=np.zeros(len(scales)),
+                                             crop_size=(size, size))
+            # Return a random crop
+            return crops[
+                tf.random_uniform(shape=[], minval=0, maxval=len(scales),
+                                  dtype=tf.int32)]
+
+        choice = tf.random_uniform(shape=[], minval=0., maxval=1.,
+                                   dtype=tf.float32)
+
+        # Only apply cropping 50% of the time
+        return tf.cond(choice < 0.5, lambda: x, lambda: random_crop(x))
+
+
+
+    # Add augmentations
+    augmentations = [flip, color, zoom, rotate]
+
+    result_tensor = images_tensor
+
+    for f in augmentations:
+        result_tensor = tf.cond(tf.random_uniform([], 0, 1) < 0.8, lambda: f(result_tensor),lambda: result_tensor)
+
+    return result_tensor
+
+
+
 def parse_config_recur(config_path):
 
     all_dicts ={}
     with open(config_path,'r') as f:
         data=json.load(f)
 
-    all_dicts = {**all_dicts,**data}
+    all_dicts = {**all_dicts, **data}
 
-    t_params = data['train_params']
-    gen_file = t_params['gen_file']
+    if 'train_file_used' in data: # is train result file
 
-    with open(gen_file) as f:
-        data_gen=json.load(f)
+        data_t_r = data
+        path_train_file = data_t_r['train_file_used']
 
-    all_dicts = {**all_dicts, **data_gen}
+    else: # is train_file with gen
 
-    used_select = data_gen['used_select']
-    with open(used_select) as f:
-        data_select=json.load(f)
+        t_params = data['train_params']
+        gen_file = t_params['gen_file']
+        with open(gen_file) as f:
+            data_gen = json.load(f)
+        all_dicts = {**all_dicts, **data_gen}
 
-    all_dicts = {**all_dicts, **data_select}
+        used_select = data_gen['used_select']
+        with open(used_select) as f:
+            data_select = json.load(f)
+        all_dicts = {**all_dicts, **data_select}
 
+        train_result_path = data_select['train_result_path']
+        with open(train_result_path, 'r') as f:
+            data_t_r = json.load(f)
+            path_train_file = data_t_r["train_file_used"]
 
-    train_result_path = data_select['train_result_path']
-    with open(train_result_path,'r') as f:
-        data_t_r = json.load(f)
-        path_train_file = data_t_r["train_file_used"]
 
     with open(path_train_file,'r') as f2:
         data_train_file = json.load(f2)
-
 
     all_dicts['model_load_path_train_result'] = data_t_r['model_load_path']
     all_dicts['model_load_path_at_train_file'] = data['model_load_path']

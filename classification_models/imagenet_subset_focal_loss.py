@@ -49,8 +49,6 @@ class imagenet_classifier_focal_loss(imagenet_classifier_cam_loss):
             cam_loss = tf.multiply(tf.reduce_sum(masked_cam), loss_lambda,
                                    name='loss_cam_v')
 
-        gamma = 2
-        lbda = 0.25
 
         gamma_fl = tf.placeholder_with_default(2.0, (),name='gamma_fl')
         lbda_fl = tf.placeholder_with_default(0.25, (), name='lbda_fl')

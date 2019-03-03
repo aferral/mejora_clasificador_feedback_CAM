@@ -1,3 +1,5 @@
+import pickle
+
 import tensorflow as tf
 from datasets.dataset import Dataset
 from datasets.cifar10_data import Cifar10_Dataset
@@ -12,7 +14,8 @@ from tensorflow.contrib.layers.python.layers import utils
 from tensorflow.python.ops import variable_scope
 from tensorflow.contrib import layers
 from tensorflow.contrib.framework.python.ops import arg_scope
-
+import numpy as np
+import cv2
 
 def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
     with variable_scope.variable_scope(scope, 'vgg_16', [inputs]) as sc:
@@ -98,14 +101,49 @@ def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
             return net, end_points
 
 
-class imagenet_classifier_cam_loss(Abstract_model):
+class imagenet_classifier_cam_loss_V2(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False,
-                 name='imagenet_classifier'):
+                 name='imagenet_classifier',fixed_mask_file=None):
         super().__init__(dataset, debug, name)
 
         self.reg_factor = 0.1
         self.lr = 0.0001
+
+        if fixed_mask_file:
+            with open(fixed_mask_file, 'rb') as f:
+                t = pickle.load(f)['masks']
+                self.fixed_mask_file = {k : (None,t[k]) for k in t}
+
+
+    def prepare_feed(self, is_train=False, debug=False):
+        if not hasattr(self,'fixed_mask') or (self.fixed_mask_file is None):
+            return super().prepare_feed(is_train=is_train,debug=debug)
+
+        else:
+            use_simple_index=False
+            base_fd = super().prepare_feed(is_train=is_train, debug=True)
+            ex_input = base_fd['model_input:0']
+
+            conv_acts, indexs = self.sess.run([self.last_conv, 'indexs_input:0'],base_fd)
+
+            batch_size = ex_input.shape[0]
+            h, w, c = conv_acts.shape[1], conv_acts.shape[2], conv_acts.shape[3]
+
+            base_cam_mask = np.zeros((batch_size, h, w))
+
+            for i in range(len(indexs)):
+                ind_img = indexs[i].decode('utf-8') if not use_simple_index else indexs[i].decode('utf-8').split('__')[1]
+                if ind_img in self.fixed_mask_file:
+                    sel_cam, current_mask = self.fixed_mask_file[ind_img]
+                    down_sampled = cv2.resize(current_mask.astype(np.float32),
+                                              (14, 14))
+                    base_cam_mask[i] = down_sampled
+
+            base_fd['cam_loss_term/cam_mask:0'] = base_cam_mask
+
+            return base_fd
+        pass
 
     def get_feed_dict(self, isTrain):
         return {"phase:0": isTrain}
@@ -128,52 +166,32 @@ class imagenet_classifier_cam_loss(Abstract_model):
         self.cam_out = self.graph.get_tensor_by_name('vgg_16/raw_CAM/cam_out:0')
 
         with tf.variable_scope("cam_loss_term"):
-            sq_cam = tf.squeeze(self.cam_out, axis=[3, 4])  # N x hl x wl x C
-
-            # selecciono solamente CAM del target N x hl x wl x 1
-            sel_index = tf.cast(tf.argmax(self.targets, axis=1), tf.int32)
-            sel_index = tf.stack([tf.range(tf.shape(sq_cam)[0]), sel_index],
-                                 axis=1, name='selected_index')
-
-            # esto es algo complejo pero lo unico que hace es seleccionar por canal el del indice
-            selected_cam = tf.gather_nd(tf.transpose(sq_cam, perm=[0, 3, 1, 2]),
-                                        sel_index, name='selected_cam')
 
             # nuevo termino de loss = CAM[label](upsample)[mask].sum() * ponderador
             # placeholders
-            cam_mask = tf.placeholder_with_default(tf.zeros_like(selected_cam),
-                                                   selected_cam.shape,
+            shape_mask = self.last_conv.shape[0:3]
+            cam_mask = tf.placeholder_with_default(tf.zeros_like(self.last_conv[:,:,:,0]),
+                                                   shape_mask,
                                                    name='cam_mask')
             self.loss_lambda = tf.placeholder_with_default(0.0, (),
                                                       name='loss_lambda')
 
-            # reduce to initial*0.2 after 200 steps
-            self.lambda_with_decay = tf.train.exponential_decay(self.loss_lambda,
-                                                                self.global_step, 200,
-                                                           0.1)
 
-            masked_cam = tf.multiply(selected_cam, cam_mask, name='masked_cam')
+            masked_cam = tf.multiply(self.last_conv,tf.expand_dims(tf.cast(cam_mask, dtype=tf.float32), -1),name='masked_cam')
 
-            cam_loss = tf.multiply(tf.abs(tf.reduce_sum(masked_cam)), self.lambda_with_decay,
-                                   name='loss_cam_v')
+            sum_per_filder = tf.reduce_sum(masked_cam,axis=(1,2))
+            acts_per_mask = tf.expand_dims(tf.reduce_sum(cam_mask,axis=(1,2)) + 1 , axis=-1) # add one to avoid divide by zero when no mask
 
-        """
-        old loss  
-        cam_loss = tf.multiply(tf.reduce_sum(masked_cam), loss_lambda,name='loss_cam_v')
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
-        
-        # loss lambda ce 
-        cam_loss = tf.multiply(tf.reduce_mean(masked_cam), loss_lambda,name='loss_cam_v')
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
-        
-        loss 3 
-        cam_loss = tf.reduce_mean(masked_cam)
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) * (1+ cam_loss)
-        
-        loss 4 use old loss buy with lambda with exponential decay 
-        """
+            real_prob = tf.reduce_sum(self.targets * self.pred,axis=1)
+            self.act_term = tf.reduce_mean(sum_per_filder / acts_per_mask, axis=1)
 
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
+            self.act_loss_term = self.act_term * tf.pow(0.2, real_prob/0.7)
+            self.mean_act_loss_term = tf.reduce_mean(self.act_loss_term)
+
+        with tf.variable_scope("ce_term"):
+            ce_term = tf.losses.softmax_cross_entropy(self.targets,predictions)
+
+        self.loss =  ce_term + self.mean_act_loss_term
 
 
 
@@ -194,5 +212,5 @@ if __name__ == "__main__":
     with tf.Session().as_default() as sess:
         t = QuickDraw_Dataset(1, 60,data_folder='./temp/quickdraw_expanded_images')
 
-        with imagenet_classifier_cam_loss(t, debug=False) as model:
+        with imagenet_classifier_cam_loss_V2(t, debug=False) as model:
             model.train()

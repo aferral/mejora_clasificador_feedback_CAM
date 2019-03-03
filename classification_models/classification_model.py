@@ -134,17 +134,22 @@ class Abstract_model(ExitStack):
         assert (not (self.softmax_weights is None)), 'Must define softmax_weights'
         assert (not (self.pred is None)), 'Must define pred. Softmax prediction layer'
 
-
-    def save_model(self,saver,out_path=None):
-        if out_path :
-            saver.save(self.sess, os.path.join(out_path, 'model'))
-            return out_path
-        else:
+    def get_model_out_folder(self):
+        if not hasattr(self,'model_out_folder'):
             now = now_string()
             path_model_checkpoint = os.path.join('model', self.save_folder, now)
-            print("Saving model at {0}".format(path_model_checkpoint))
             os.makedirs(path_model_checkpoint, exist_ok=True)
-            saver.save(self.sess,os.path.join(path_model_checkpoint, 'saved_model'))
+            self.model_out_folder = path_model_checkpoint
+        return self.model_out_folder
+
+    def save_model(self,saver,out_path=None,prefix='saved_model'):
+        if out_path :
+            saver.save(self.sess, os.path.join(out_path, prefix))
+            return out_path
+        else:
+            path_model_checkpoint = self.get_model_out_folder()
+            print("Saving model at {0}".format(path_model_checkpoint))
+            saver.save(self.sess,os.path.join(path_model_checkpoint, prefix))
         return path_model_checkpoint
 
     #@do_profile()
@@ -155,6 +160,7 @@ class Abstract_model(ExitStack):
 
         i = 0
         show_batch_dist = True
+        best_eval = 0
 
         with timeit() as t:
             for i in range(1): # todo refactor
@@ -176,7 +182,7 @@ class Abstract_model(ExitStack):
 
                         i += 1
                     except tf.errors.OutOfRangeError:
-                        log = 'break at {0}'.format(i)
+                        log = 'break at2 {0}'.format(i)
                         self.current_log += '{0} \n'.format(log)
                         print(log)
                         break
@@ -184,10 +190,18 @@ class Abstract_model(ExitStack):
                 # Eval in val set
                 if eval:
                     print("Doing eval")
-                    out_string = self.eval()
+                    out_string,acc_v = self.eval()
+
+                    if save_model and (best_eval < acc_v):
+                        best_eval = acc_v
+                        self.save_model(saver,prefix='best')
+                    if best_eval > 0.78:
+                        break
+                if best_eval > 0.78:
+                    break
+
         # Save model
         if save_model:
-
             path_model_checkpoint = self.save_model(saver)
 
             # save accuracy in val set
@@ -201,6 +215,7 @@ class Abstract_model(ExitStack):
                     'train_file_used' : train_file_used}
             out_folder = os.path.join('config_files','train_result')
             os.makedirs(out_folder,exist_ok=True)
+            now = now_string()
             json_name = '{0}__{1}__{2}.json'.format(self.dataset.__class__.__name__,self.__class__.__name__,now)
             with open(os.path.join(out_folder,json_name),'w') as f:
                 json.dump(data,f)
@@ -223,14 +238,19 @@ class Abstract_model(ExitStack):
 
         return image,conv_acts, softmax_w, pred
 
-    def load(self, model_folder):
+    def show_graph(self):
+        graph = tf.get_default_graph()
+        show_graph(graph)
 
-        optimistic_restore(self.sess, tf.train.latest_checkpoint(model_folder))
+    def load(self, model_folder):
+        checkpoint_path = tf.train.latest_checkpoint(model_folder)
+        print("Using {0}".format(checkpoint_path))
+
+        optimistic_restore(self.sess, checkpoint_path )
         # new_saver = tf.train.Saver()
         # new_saver.restore(self.sess, tf.train.latest_checkpoint(model_folder))
 
-        graph = tf.get_default_graph()
-        show_graph(graph)
+        self.show_graph()
 
     def eval(self,mode='val',samples=None):
 
@@ -267,12 +287,13 @@ class Abstract_model(ExitStack):
                 break
         y_true = np.hstack(y_true)
         y_pred = np.hstack(y_pred)
+        acc_value = accuracy_score(y_true, y_pred)
         out_string = ""
-        out_string += "{1} set accuracy is {0:.2f} \n".format(accuracy_score(y_true, y_pred), name)
+        out_string += "{1} set accuracy is {0:.2f} \n".format(acc_value, name)
         out_string += "{0} \n".format(confusion_matrix(y_true, y_pred))
         out_string += "\n \n \n"
         print(out_string)
-        return out_string
+        return out_string,acc_value
 
 
 

@@ -119,13 +119,13 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
     os.makedirs(path_out_cams, exist_ok=True)
 
     if eval:
-        out_string = classifier.eval(mode='val')
+        out_string = classifier.eval(mode='val')[0]
         with open(os.path.join(out_f, 'eval.txt'), 'a') as f:
             f.write("Backpropagation: {0} val: {1}".format(ind_backprop,
                                                            current_log))
             f.write("Backpropagation: {0} val: {1}".format(ind_backprop,
                                                            out_string))
-        out_string = classifier.eval(mode='test')
+        out_string = classifier.eval(mode='test')[0]
         with open(os.path.join(out_f, 'eval.txt'), 'a') as f:
             f.write("Backpropagation: {0} test: {1}".format(ind_backprop,
                                                             current_log))
@@ -304,6 +304,8 @@ def flush_to_dataset(dataset_one_use, index_list, img_list, label_list,
         t_index_list.append(n_index)
         t_img_list.append(current_img)
         t_label_list.append(current_label)
+
+    t_img_list= list(map(lambda x: x if len(x.shape) == 3 else np.expand_dims(x, axis=-1),t_img_list))
 
     dataset_one_use.prepare_dataset(np.array(t_index_list),
                                     np.array(t_img_list),
