@@ -35,7 +35,7 @@ python datasets/imagenet_data.py # ESTO NO
 
 # Como conseguir los datos
 
-__Forma fácil: Es posible descargar todos los datos contenidos en este zip (). Descomprimir los contenidos en una carpeta llamada temp. Los contenidos descomprimidos utilizan 37 G de espacio.__
+__Forma fácil: Es posible descargar todos los datos contenidos en este zip (https://drive.google.com/file/d/1Sbm0o_JTHuhl7J4CiXdzUi83g4-kpF_V/view?usp=sharing). Descomprimir los contenidos en una carpeta llamada temp. Los contenidos descomprimidos utilizan 37 G de espacio.__
 
 **IMAGENET subset dataset:** Ejecutar el script en tf_records_parser lo cual descargara el subconjunto de imágenes y los procesara en tf_records que leen los clasificadores. Con esto el dataset ya esta habilitado.
 
