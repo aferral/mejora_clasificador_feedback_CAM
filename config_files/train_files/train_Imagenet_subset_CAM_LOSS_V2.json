@@ -1,0 +1,13 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "Imagenet_subset",
+  "model_key": "imagenet_cam_loss_V2",
+  "train_params" : {"epochs" : 1},
+  "model_load_path" : null,
+
+  "model_params": {"fixed_mask_file" : "./config_files/mask_files/all_filtered_masks.pkl"},
+  "dataset_params": {
+    "data_folder": "./temp/imagenet_subset"
+  }
+}
+

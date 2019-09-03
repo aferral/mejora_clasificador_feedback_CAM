@@ -22,8 +22,8 @@ with open(config_path,'r') as f:
     username = config_dict['username']
     accessKey = config_dict['accessKey']
 
-    assert(not (username == "HERE_USERNAME"))," Edit the config_file"
-    assert(not (accessKey == "Go to image-net.org/download-images if you dont have one"))," Edit the config_file"
+    #assert(not (username == "HERE_USERNAME"))," Edit the config_file"
+    #assert(not (accessKey == "Go to image-net.org/download-images if you dont have one"))," Edit the config_file"
 
 BASE_FOLDER = os.getcwd()
 RANDOM_SEED = 1
@@ -191,7 +191,7 @@ if __name__ == '__main__':
 
 
     print("Downloading images from IMAGENET")
-    download_subset(out_folder)
+    #download_subset(out_folder)
     print("Download ended. Outfolder: {0}".format(out_folder))
 
 

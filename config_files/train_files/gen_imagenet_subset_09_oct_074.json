@@ -1,0 +1,10 @@
+{
+"train_mode" : "gen_train",
+"model_load_path" : null,
+"train_params" : {"gen_file" : "./gen_images/Imagenet_Dataset_Replace_with_dataset_crops_11_Oct_2018__07_45/exp_details.json",
+"just_eval" : false
+ }
+}
+
+
+

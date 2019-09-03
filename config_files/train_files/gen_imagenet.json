@@ -1,0 +1,6 @@
+{
+"train_mode" : "gen_train",
+"model_load_path" : "./model/Imagenet_subset_vgg16_CAM/29_May_2018__15_16",
+"train_params" : {"gen_file" : "./config_files/gen_files/imagenet_subset.json" }
+}
+

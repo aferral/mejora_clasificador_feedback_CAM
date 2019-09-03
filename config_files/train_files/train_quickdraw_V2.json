@@ -1,0 +1,13 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "quickdraw",
+  "model_key": "quickdraw",
+  "train_params" : {"epochs" : 1,"just_eval" : false},
+  "model_load_path" : null,
+
+  "model_params": {},
+  "dataset_params": {
+    "data_folder": "./temp/quickdraw_expanded_images"
+  }
+}
+

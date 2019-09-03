@@ -119,18 +119,21 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
     os.makedirs(path_out_cams, exist_ok=True)
 
     if eval:
-        out_string = classifier.eval(mode='val')[0]
+        out_string,val_acc = classifier.eval(mode='val')
         with open(os.path.join(out_f, 'eval.txt'), 'a') as f:
             f.write("Backpropagation: {0} val: {1}".format(ind_backprop,
                                                            current_log))
             f.write("Backpropagation: {0} val: {1}".format(ind_backprop,
                                                            out_string))
-        out_string = classifier.eval(mode='test')[0]
+        out_string,test_acc = classifier.eval(mode='test')
         with open(os.path.join(out_f, 'eval.txt'), 'a') as f:
             f.write("Backpropagation: {0} test: {1}".format(ind_backprop,
                                                             current_log))
             f.write("Backpropagation: {0} test: {1}".format(ind_backprop,
                                                             out_string))
+        #  write val, test metrics
+        with open(os.path.join(out_f,'accuracy_simple.csv'),'a') as f:
+            f.write('acc_val,{0},acc_test,{1}\n'.format(val_acc,test_acc))
 
 
     aimgs, acams, apred, alabels, a_r_cams = get_img_RAW_cam_index_batch(
@@ -162,6 +165,13 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
                 cv2.imwrite(os.path.join(out_f, '{0}_original.png'.format(
                     name_cam_raw)), img)
 
+        # write pred to file
+        with open(os.path.join(out_f,'indexs_pred.csv'),'a') as f:
+
+            pred_st = ','.join(["{cx},{scx}".format(cx=ind,scx=scores[ind]) for ind in range(len(all_cams)) ] )
+
+            format_string = "it,{0},index,{1},target,{2},{3}\n".format(ind_backprop,index_key,r_label,pred_st)
+            f.write(format_string)
 
 
         # plot all CAM for index
@@ -173,10 +183,15 @@ def eval_current_model(name, classifier, dataset, index_list, ind_backprop,
             scor = "{0:.2f}".format(scores[ind])
             title = 'r:{0} c:{1} sc:{2}'.format(r_label, ind, scor)
 
+            w=img_colored.shape[1]
+            if w < 200:
+                img_colored = cv2.resize(img_colored,(200,200))
+            font_scale = 0.6
+
             cv2.putText(img_colored, title,
                         (0, int(img_colored.shape[1]*0.9)),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
+                        font_scale,
                         (255, 255, 255),
                         2)
             sep = np.zeros((img_colored.shape[0],30,img_colored.shape[2]))
@@ -286,6 +301,8 @@ def do_backprop(model, base_dataset, dataset_one_use, base_index_list,
     eval_current_model('gen', model, dataset_one_use,
                        current_index_list, current_backprop, out_f,
                        model.current_log)
+
+
     return current_backprop
 
 

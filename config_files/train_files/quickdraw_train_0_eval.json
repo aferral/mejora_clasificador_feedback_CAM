@@ -1,0 +1,13 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "quickdraw",
+  "model_key": "imagenet_cam_loss",
+  "train_params" : {"epochs" : 0,"just_eval" : true},
+  "model_load_path" : "model/imagenet_classifier/19_Jan_2019__14_25",
+
+  "model_params": {},
+  "dataset_params": {
+    "data_folder": "./temp/quickdraw_expanded_images"
+  }
+}
+

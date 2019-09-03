@@ -1,0 +1,12 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "simple_figures",
+  "model_key": "simple_model",
+  "train_params" : {"epochs" : 1,"just_eval" : false},
+  "model_load_path" : null,
+
+  "model_params": {},
+  "dataset_params": {"data_folder" : "./temp/dataset_simbols_ruido_reducido"
+  }
+}
+

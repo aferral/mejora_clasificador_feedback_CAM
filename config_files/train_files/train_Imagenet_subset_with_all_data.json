@@ -1,0 +1,14 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "Imagenet_subset",
+  "model_key": "imagenet_custom",
+  "train_params" : {"epochs" : 1},
+  "model_load_path" : null,
+
+  "model_params": {},
+  "dataset_params": {
+    "data_folder": "./temp/imagenet_subset",
+"use_all_in_train" : true
+  }
+}
+

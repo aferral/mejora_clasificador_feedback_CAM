@@ -140,12 +140,12 @@ class Imagenet_Dataset(Dataset):
 
 
         # preprocesss
-        shuffle_buffer = int(self.n_classes*1000*0.8)
-        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(epochs).batch(
+        shuffle_buffer = int(self.n_classes*1000*0.6)
+        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=3).shuffle(shuffle_buffer).cache().repeat(epochs).batch(
             batch_size).prefetch(3)
-        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(1).batch(
+        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=3).shuffle(shuffle_buffer).cache().repeat(1).batch(
             batch_size).prefetch(3)
-        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=4).shuffle(shuffle_buffer).cache().repeat(1).batch(
+        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=3).shuffle(shuffle_buffer).cache().repeat(1).batch(
             batch_size).prefetch(3)
 
         # Create iterator

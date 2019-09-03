@@ -12,7 +12,7 @@ import cv2
 from tf_records_parser.cwr_parser import grayscaleEq
 
 
-data_folder = './temp/dataset_simbols'
+
 
 
 def read_img(path):
@@ -23,12 +23,13 @@ class Simple_figures_dataset(Dataset):
 
 
 
-    def __init__(self,epochs,batch_size,**kwargs):
+    def __init__(self,epochs,batch_size,data_folder = './temp/dataset_simbols',**kwargs):
 
         self.class_labels = {'xi' : 0, 'epsilon' : 1, 'zeta' : 2}
         self.r_class_labels = {self.class_labels[k] : k for k in self.class_labels}
 
         self.all_indexs = []
+        self.data_folder = data_folder
 
 
 
@@ -36,7 +37,7 @@ class Simple_figures_dataset(Dataset):
         data_test = []
 
         def process_folder(fname,name):
-            folder_path = os.path.join(data_folder, fname)
+            folder_path = os.path.join(self.data_folder, fname)
             label = self.class_labels[name]
             files = os.listdir(folder_path)
 
@@ -86,7 +87,9 @@ class Simple_figures_dataset(Dataset):
         self.valid_dataset = dataset_val.map(preprocess,num_parallel_calls=4).shuffle(300).batch(batch_size)
         self.dataset_test = dataset_test.map(preprocess,num_parallel_calls=4).shuffle(300).batch(batch_size)
 
-        self.dataset_test, self.train_dataset = self.train_dataset,self.dataset_test
+
+        #self.dataset_test, self.train_dataset = self.train_dataset,self.dataset_test
+        #self.train_dataset = self.dataset_test
 
 
         # Create iterator
@@ -137,7 +140,7 @@ class Simple_figures_dataset(Dataset):
         folder = 'out_{0}'.format('_'.join(parts[:-1]))
         label = self.class_labels[parts[-2]]
 
-        return [read_img(os.path.join(data_folder,folder,index))], [label]
+        return np.expand_dims(read_img(os.path.join(self.data_folder,folder,index)),axis=0), np.expand_dims(label,axis=0)
 
 
     def get_data_range(self):

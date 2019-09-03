@@ -76,7 +76,7 @@ if __name__ == '__main__':
         gen=insert_crop_random_image(dataset_obj,3)
 
         mask = np.zeros((224,224))
-        mask[100:200,100:200] = 1
+        mask[180:200,100:200] = 1
         mask=mask.astype(np.bool)
 
         img_org,label = dataset_obj.get_train_image_at("n02114855_114.JPEG")

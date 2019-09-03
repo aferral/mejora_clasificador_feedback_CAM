@@ -1,1 +1,6 @@
 imagenet_config.json
+dataset_acts_*
+*.pkl
+*.png
+*.txt
+*.html

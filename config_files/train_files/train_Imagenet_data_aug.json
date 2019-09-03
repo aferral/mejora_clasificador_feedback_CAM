@@ -1,0 +1,13 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "Imagenet_subset",
+  "model_key": "imagenet_custom",
+  "train_params" : {"epochs" : 1, "just_eval" : true},
+  "model_load_path" : "model/imagenet_classifier/20_Feb_2019__18_05",
+
+  "model_params": {},
+  "dataset_params": {
+    "data_folder": "./temp/imagenet_subset", "add_data_augmentation" : true
+  }
+}
+

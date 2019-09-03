@@ -190,14 +190,15 @@ class model_manager_obj:
         if index in self.current_mask_index_map:
             return self.current_mask_index_map[index].reshape(shape_2d).copy()
         else:
-            print("Creating mask for index {0}".format(index))
+            print("No mask found for index {0} returning dummy val".format(index))
 
             new_mask = np.zeros(shape_2d).astype(np.bool)
-            self.current_mask_index_map[index] = new_mask
-            # update file
-            self.update_mask_file()
+            return new_mask
+            # self.current_mask_index_map[index] = new_mask
+            # # update file
+            # self.update_mask_file()
 
-        return self.current_mask_index_map[index].reshape(shape_2d).copy()
+        # return self.current_mask_index_map[index].reshape(shape_2d).copy()
 
     def set_mask(self, index, mask):
         self.current_mask_index_map[index] = mask

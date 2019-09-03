@@ -138,9 +138,9 @@ class QuickDraw_Dataset(Dataset):
 
         # preprocesss
         # shuffle_buffer = int(self.n_classes*1000*0.8)
-        self.train_dataset = dataset_train.map(preprocess, num_parallel_calls=4).shuffle(29544).repeat(epochs).batch(batch_size)
-        self.valid_dataset = dataset_val.map(preprocess, num_parallel_calls=4).shuffle(29544).repeat(1).batch(batch_size)
-        self.dataset_test = dataset_test.map(preprocess, num_parallel_calls=4).shuffle(29544).repeat(1).batch(batch_size)
+        self.train_dataset = dataset_train.map(preprocess).repeat(epochs).batch(batch_size)
+        self.valid_dataset = dataset_val.map(preprocess).repeat(1).batch(batch_size)
+        self.dataset_test = dataset_test.map(preprocess).repeat(1).batch(batch_size)
 
         # Create iterator
         iterator = self.iterator = tf.data.Iterator.from_structure(self.train_dataset.output_types,

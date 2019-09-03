@@ -101,8 +101,8 @@ def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
 class imagenet_classifier_CONV_LOSS(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False,
-                 name='imagenet_classifier'):
-        super().__init__(dataset, debug, name)
+                 name='imagenet_classifier',**kwars):
+        super().__init__(dataset, debug, name,**kwars)
 
         self.reg_factor = 0.1
         self.lr = 0.0001
@@ -142,10 +142,11 @@ class imagenet_classifier_CONV_LOSS(Abstract_model):
             masked_cam = tf.multiply(self.last_conv,tf.expand_dims(tf.cast(cam_mask, dtype=tf.float32), -1),name='masked_cam')
 
 
-            cam_loss = tf.multiply(tf.abs(tf.reduce_sum(masked_cam)), self.loss_lambda,
+            self.cam_loss = tf.multiply(tf.abs(tf.reduce_sum(masked_cam)), self.loss_lambda,
                                    name='loss_cam_v')
 
-        self.loss = tf.losses.softmax_cross_entropy(self.targets,predictions) + cam_loss
+        self.ce_term = tf.losses.softmax_cross_entropy(self.targets,predictions)
+        self.loss = self.ce_term + self.cam_loss
 
 
 
@@ -158,6 +159,12 @@ class imagenet_classifier_CONV_LOSS(Abstract_model):
         prediction = tf.argmax(predictions, 1)
         equality = tf.equal(prediction, tf.argmax(self.targets, 1))
         self.accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
+
+        # define summaries
+        tf.summary.scalar('loss_ce', self.ce_term)
+        tf.summary.scalar('loss_activacion_mean', self.cam_loss)
+        tf.summary.scalar('loss_total', self.loss)
+        tf.summary.scalar('lambda_v',self.loss_lambda)
 
 
 

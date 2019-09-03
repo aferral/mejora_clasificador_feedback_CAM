@@ -36,6 +36,9 @@ def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
 
             net = layers_lib.repeat(net, 2, layers.conv2d, filters, [3, 3],
                                     scope='conv2')
+
+            # net = layers_lib.repeat(net, 8, layers.conv2d, filters, [3, 3],scope='conv3')
+
             #last_conv = layers_lib.max_pool2d(net, [2, 2], scope='pool2')
 
             last_conv = net
@@ -71,8 +74,8 @@ def get_slim_arch_bn(inputs, isTrainTensor, num_classes=1000, scope='vgg_16'):
 class simple_classifier(Abstract_model):
 
     def __init__(self, dataset: Dataset, debug=False,
-                 name='simple_classifier',fixed_mask_file=None):
-        super().__init__(dataset, debug, name)
+                 name='simple_classifier',fixed_mask_file=None,**kwargs):
+        super().__init__(dataset, debug, name,**kwargs)
 
         self.reg_factor = 0.1
         self.lr = 0.0001
@@ -155,14 +158,19 @@ class simple_classifier(Abstract_model):
             self.act_term = tf.reduce_mean(sum_per_filder / acts_per_mask, axis=1)
 
             #self.act_loss_term = self.act_term * tf.pow(0.8, real_prob/0.9)
-            self.act_loss_term = self.act_term *tf.pow(0.8, real_prob / 0.999)
 
-            self.mean_act_loss_term = tf.reduce_mean(self.act_loss_term)
+            self.act_loss_term = self.act_term *tf.pow(0.8, real_prob/2) #self.act_term * 3*tf.pow(0.9, real_prob/0.99) #self.act_term*0.5 *tf.pow(0.2, real_prob/2)
+            self.mean_act_loss_term =   tf.reduce_sum(self.act_loss_term) / (tf.reduce_sum(tf.sign(self.act_loss_term))+0.1) # tf.reduce_mean(self.act_loss_term)
 
         with tf.variable_scope("ce_term"):
             ce_term = tf.losses.softmax_cross_entropy(self.targets,predictions)
 
         self.loss =  ce_term + self.mean_act_loss_term
+
+        # define summaries
+        tf.summary.scalar('loss_ce', ce_term)
+        tf.summary.scalar('loss_activacion_mean', self.mean_act_loss_term)
+        tf.summary.scalar('loss_total', self.loss)
 
 
 
@@ -181,11 +189,11 @@ class simple_classifier(Abstract_model):
 if __name__ == "__main__":
     from datasets.quickdraw_dataset import  QuickDraw_Dataset
     with tf.Session().as_default() as sess:
-        t = Simple_figures_dataset(100, 60)
+        t = Simple_figures_dataset(1, 60,data_folder='./temp/dataset_simbols_ruido')
 
         with simple_classifier(t, debug=False) as model:
 
-            model.train(save_model=False)
+            model.train(save_model=False,special_t=500)
             model.show_graph()
 
             model.eval(mode='test')

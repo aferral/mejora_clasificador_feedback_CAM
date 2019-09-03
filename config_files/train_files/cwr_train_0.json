@@ -1,0 +1,12 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "CWR",
+  "model_key": "CWR_classifier",
+  "train_params" : {"epochs" : 2},
+  "model_load_path" : null,
+
+  "model_params": {},
+  "dataset_params": {
+    "data_folder": "./temp/CW96Scalograms"
+  }
+}

@@ -44,7 +44,7 @@ def optimistic_restore(session, save_file):
 
 class Abstract_model(ExitStack):
 
-    def __init__(self, dataset: Dataset, debug=False, save_name=None):
+    def __init__(self, dataset: Dataset, debug=False, save_name=None,use_summary=False,out_folder=None,tf_config=None):
         super().__init__()
         self.sess = None
         self.dataset = dataset
@@ -52,6 +52,9 @@ class Abstract_model(ExitStack):
         self.save_folder=save_name
         self.graph = None
         self.current_log = ''
+        self.use_summary=use_summary
+        self.model_out_folder = out_folder
+        self.tf_config = tf_config
 
     def get_name(self):
         return self.save_folder
@@ -62,9 +65,11 @@ class Abstract_model(ExitStack):
         self.enter_context(self.graph.as_default())
 
         if tf.get_default_session():
+            if self.tf_config:
+                print('WARNING tf config set but session already started. Couldnt set desired config.')
             self.sess = tf.get_default_session()
         else:
-            self.sess = tf.Session()
+            self.sess = tf.Session(config=self.tf_config)
 
         self.enter_context(self.sess.as_default())
 
@@ -91,6 +96,14 @@ class Abstract_model(ExitStack):
 
         self.define_arch()
         self.check_arch()
+
+        if self.use_summary:
+            out_path_summaries = os.path.join(self.get_model_out_folder(), 'logs')
+            os.makedirs(out_path_summaries,exist_ok=True)
+            self.summary_train = tf.summary.FileWriter(out_path_summaries, self.sess.graph)
+            self.all_summaries = tf.summary.merge_all()
+
+
 
         init_op = tf.global_variables_initializer()
         self.sess.run(init_op)
@@ -135,7 +148,7 @@ class Abstract_model(ExitStack):
         assert (not (self.pred is None)), 'Must define pred. Softmax prediction layer'
 
     def get_model_out_folder(self):
-        if not hasattr(self,'model_out_folder'):
+        if (not hasattr(self,'model_out_folder')) or (self.model_out_folder is None):
             now = now_string()
             path_model_checkpoint = os.path.join('model', self.save_folder, now)
             os.makedirs(path_model_checkpoint, exist_ok=True)
@@ -153,7 +166,7 @@ class Abstract_model(ExitStack):
         return path_model_checkpoint
 
     #@do_profile()
-    def train(self,train_file_used=None,save_model=True,eval=True):
+    def train(self,train_file_used=None,save_model=True,eval=True,special_t=1):
 
         self.current_log=''
         saver = tf.train.Saver()
@@ -162,14 +175,19 @@ class Abstract_model(ExitStack):
         show_batch_dist = True
         best_eval = 0
 
+
         with timeit() as t:
-            for i in range(1): # todo refactor
+            for i in range(special_t): # todo refactor
                 self.dataset.initialize_iterator_train(self.sess)
                 while True:
                     try:
                         fd = self.prepare_feed(is_train=True,debug=self.debug)
 
-                        l, _, acc,tgts = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets], fd)
+                        if self.use_summary:
+                            l, _, acc, tgts,summary = self.sess.run([self.loss, self.train_step, self.accuracy,self.targets,self.all_summaries], fd)
+                            self.summary_train.add_summary(summary)
+                        else:
+                            l, _, acc, tgts = self.sess.run([self.loss, self.train_step, self.accuracy, self.targets], fd)
 
 
                         if i % 100 == 0:
@@ -195,10 +213,10 @@ class Abstract_model(ExitStack):
                     if save_model and (best_eval < acc_v):
                         best_eval = acc_v
                         self.save_model(saver,prefix='best')
-                    if best_eval > 0.78:
-                        break
-                if best_eval > 0.78:
-                    break
+                #     if best_eval > 0.78:
+                #         break
+                # if best_eval > 0.78:
+                #     break
 
         # Save model
         if save_model:

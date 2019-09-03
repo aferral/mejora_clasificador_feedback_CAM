@@ -1,0 +1,11 @@
+{
+"train_mode" : "gen_train",
+"model_load_path" : null,
+"train_params" : {"gen_file" : "./gen_images/QuickDraw_Dataset_Replace_with_dataset_crops_20_Jan_2019__11_11/exp_details.json",
+"just_eval" : false
+ }
+}
+
+
+
+

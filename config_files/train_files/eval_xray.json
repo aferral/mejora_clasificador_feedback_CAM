@@ -1,0 +1,12 @@
+{
+"train_mode" : "epochs",
+  "dataset_key": "xray",
+  "model_key": "imagenet_cam_loss_V2",
+  "train_params" : {"epochs" : 1,"just_eval" : true},
+  "model_load_path" : "./model/imagenet_classifier/21_Apr_2019__11_43",
+
+  "model_params": {},
+  "dataset_params": {"data_folder" : "./temp/dataset_xray_imgs"
+  }
+}
+

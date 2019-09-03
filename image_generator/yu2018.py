@@ -64,3 +64,20 @@ class yu2018generative(Abstract_generator):
                 out_img = result[0][:, :, ::-1]
             return [out_img]
 
+
+if __name__ == '__main__':
+    t=yu2018generative()
+    from datasets.imagenet_data import Imagenet_Dataset
+    dataset = Imagenet_Dataset(1, 55, data_folder='temp/imagenet_subset')
+    index_image = 'n02119022_3129.JPEG'
+    img, label = dataset.get_train_image_at(index_image)
+    img = img.squeeze()
+
+    mask = np.zeros((img.shape[0:2]))
+    xf=int(mask.shape[0]*0.5)
+    yf=int(mask.shape[1]*0.5)
+    mask[0:xf,0:yf] = 1
+
+    res=t.generate_img_mask(img,mask)
+
+    pass

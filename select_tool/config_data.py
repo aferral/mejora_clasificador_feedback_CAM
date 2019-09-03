@@ -6,6 +6,7 @@ from classification_models.imagenet_subset_cam_loss_v2 import \
 from classification_models.quickdraw_classifier import quickdraw_classifier
 from classification_models.simple_model import simple_classifier
 from datasets.simple_figures import Simple_figures_dataset
+from datasets.x_ray_data import Xray_dataset
 from utils import imshow_util
 from classification_models.vgg_16_batch_norm import vgg_16_batchnorm
 from datasets.cifar10_data import Cifar10_Dataset
@@ -21,7 +22,8 @@ dataset_obj_dict = {
     'cifar10' : Cifar10_Dataset,
     'digits' : Digits_Dataset,
     'quickdraw' : QuickDraw_Dataset,
-    'simple_figures' : Simple_figures_dataset
+    'simple_figures' : Simple_figures_dataset,
+    'xray' : Xray_dataset
 }
 
 model_obj_dict = {
@@ -32,7 +34,7 @@ model_obj_dict = {
     'imagenet_cam_loss' : imagenet_classifier_cam_loss,
     'imagenet_cam_loss_V2' : imagenet_classifier_cam_loss_V2,
     'quickdraw' : quickdraw_classifier,
-    'simple_model' : simple_classifier
+    'simple_model' : simple_classifier,
 }
 
 default_keys = ['mask_files','model_load_path','train_file_used']
