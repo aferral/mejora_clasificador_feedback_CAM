@@ -6,7 +6,7 @@ grpcio==1.11.0
 html5lib==0.9999999
 Markdown==2.6.11
 numpy==1.14.3
-protobuf==3.5.2.post1
+protobuf==3.15.0
 readline==6.2.4.1
 scikit-learn==0.19.1
 scipy==1.1.0
